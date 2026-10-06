@@ -6,7 +6,7 @@ import {
   QrCode, Images, CalendarDays, Users, Download, ChevronLeft,
   Camera, CheckCircle2, LockKeyhole, X, Sparkles, LogOut,
   FileText, Image as ImageIcon, SwitchCamera, Eye, Save, SkipForward,
-  Star, Upload, Volume2
+  Star, Upload, Volume2, Search, Check, MonitorPlay, ChevronRight
 } from 'lucide-react'
 
 const DEFAULT_EVENT = {
@@ -160,6 +160,10 @@ export default function VoiceMentoPhase1() {
   const [selectedMessage, setSelectedMessage] = useState(null)
   const [storageInfo, setStorageInfo] = useState({usage:0,quota:0})
   const [assetError, setAssetError] = useState('')
+  const [galleryTab, setGalleryTab] = useState('all')
+  const [gallerySearch, setGallerySearch] = useState('')
+  const [slideshowOpen, setSlideshowOpen] = useState(false)
+  const [slideIndex, setSlideIndex] = useState(0)
 
   const [showAdminGate, setShowAdminGate] = useState(false)
   const [pin, setPin] = useState('')
@@ -242,6 +246,34 @@ export default function VoiceMentoPhase1() {
     note: messages.filter(m => m.type === 'note').length
   }), [messages])
 
+  const galleryItems = useMemo(() => {
+    const q=gallerySearch.trim().toLowerCase()
+    return messages.filter(m => {
+      const matchesSearch=!q || (m.guest||'').toLowerCase().includes(q) || (m.note||'').toLowerCase().includes(q)
+      if (!matchesSearch) return false
+      if (galleryTab==='favorites') return !!m.favorite
+      if (galleryTab==='photos') return m.type==='photo' || !!m.photoBlob
+      if (galleryTab==='audio') return m.type==='audio'
+      if (galleryTab==='video') return m.type==='video'
+      if (galleryTab==='notes') return m.type==='note'
+      return true
+    })
+  },[messages,galleryTab,gallerySearch])
+
+  const slideshowItems = useMemo(() =>
+    messages.filter(m => m.approved && (m.type==='photo' || !!m.photoBlob) && (m.photoUrl || m.url))
+  ,[messages])
+
+  useEffect(() => {
+    if (!slideshowOpen || slideshowItems.length < 2) return
+    const timer=setInterval(()=>setSlideIndex(i=>(i+1)%slideshowItems.length),4500)
+    return ()=>clearInterval(timer)
+  },[slideshowOpen,slideshowItems.length])
+
+  useEffect(() => {
+    if (slideIndex >= slideshowItems.length) setSlideIndex(0)
+  },[slideshowItems.length,slideIndex])
+
   function saveEvent(next) {
     setEvent(next)
     try { localStorage.setItem('voicemento_event', JSON.stringify(next)) } catch {}
@@ -284,6 +316,19 @@ export default function VoiceMentoPhase1() {
       setMessages(prev=>prev.map(x=>x.id===updated.id?updated:x))
       if (selectedMessage?.id===updated.id) setSelectedMessage(updated)
     } catch {}
+  }
+
+  async function toggleApproval(item) {
+    const updated={...item,approved:!item.approved}
+    try {
+      await dbPut(storedItem(updated))
+      setMessages(prev=>prev.map(x=>x.id===updated.id?updated:x))
+      if (selectedMessage?.id===updated.id) setSelectedMessage(updated)
+    } catch {}
+  }
+
+  function openGallery() {
+    requestAnimationFrame(()=>document.getElementById('galleryWorkspace')?.scrollIntoView({behavior:'smooth',block:'start'}))
   }
 
   function openAdmin() {
@@ -632,7 +677,9 @@ export default function VoiceMentoPhase1() {
       note:pending.note || null,
       photoBlob:attachedPhoto ? attachedPhoto.blob : (pending.type === 'photo' ? pending.blob : null),
       photoCount:pending.photoCount || 0,
-      createdAt:new Date().toISOString()
+      createdAt:new Date().toISOString(),
+      approved:false,
+      favorite:false
     }
     try {
       await dbPut(item)
@@ -662,6 +709,7 @@ export default function VoiceMentoPhase1() {
           <p className="eventDate">{event.subtitle}</p>
           <p className="entranceHint">Tap the booth and leave a memory for the happy couple.</p>
           {event.hashtag&&<p className="eventHashtag">{event.hashtag}</p>}
+          {event.privacy==='guests'&&messages.some(m=>m.approved)&&<button className="guestGalleryButton" onClick={()=>setView('guestGallery')}><Images size={17}/> View event gallery</button>}
         </section>
         <button className="boothStage" onClick={enterBooth} aria-label="Enter VoiceMento">
           <span className="floorShadow"/><span className="boothGlow"/>
@@ -678,6 +726,27 @@ export default function VoiceMentoPhase1() {
         </button>
         <p className="poweredBy">VOICEMENTO · DIGITAL EVENT GUESTBOOK</p>
         <AdminGate open={showAdminGate} onClose={()=>setShowAdminGate(false)} pin={pin} setPin={setPin} error={pinError} setError={setPinError} onSubmit={submitAdmin}/>
+      </main>
+    )
+  }
+
+  if (view === 'guestGallery') {
+    const approved=messages.filter(m=>m.approved)
+    return (
+      <main className={'guestGalleryScreen theme-'+event.theme} style={{'--accent':event.accent}}>
+        <Atmosphere type={event.ambience} intensity="subtle" subtle/>
+        <button className="guestExit" onClick={()=>setView('entrance')}><ChevronLeft size={19}/> Back</button>
+        <header className="guestGalleryHeader">
+          <p className="tinyLabel">THEIR STORY SO FAR</p>
+          <h1>{event.title}</h1>
+          <p>{event.hashtag}</p>
+        </header>
+        <div className="guestGalleryGrid">
+          {approved.filter(m=>m.type==='photo'||m.photoUrl).map(m=><button key={m.id} className="guestGalleryTile" onClick={()=>setSelectedMessage(m)}><img src={m.photoUrl||m.url} alt={m.guest}/><span>{m.guest}</span></button>)}
+          {approved.filter(m=>m.type==='note').map(m=><button key={m.id} className="guestNoteTile" onClick={()=>setSelectedMessage(m)}><FileText/><strong>{m.guest}</strong><span>{m.note}</span></button>)}
+        </div>
+        {approved.length===0&&<div className="guestGalleryEmpty"><Heart/><h2>The gallery is waiting for its first approved memory.</h2></div>}
+        {selectedMessage&&<MemoryViewer message={selectedMessage} onClose={()=>setSelectedMessage(null)}/>}
       </main>
     )
   }
@@ -803,8 +872,8 @@ export default function VoiceMentoPhase1() {
       <aside className="sidebar">
         <div className="brand"><div className="brandMark"><Phone size={23}/></div><div><strong>VoiceMento</strong><span>Events</span></div></div>
         <nav>
-          <button className="nav active"><CalendarDays size={20}/> Event</button>
-          <button className="nav"><Images size={20}/> Gallery</button>
+          <button className="nav active" onClick={()=>window.scrollTo({top:0,behavior:'smooth'})}><CalendarDays size={20}/> Event</button>
+          <button className="nav" onClick={openGallery}><Images size={20}/> Gallery</button>
           <button className="nav"><Users size={20}/> Guests</button>
           <button className="nav"><Settings size={20}/> Settings</button>
         </nav>
@@ -947,30 +1016,78 @@ export default function VoiceMentoPhase1() {
           </section>
         </div>
 
-        <section className="panel messagesPanel">
-          <div className="panelHead"><div><span>Recent memories</span><small>New recordings, photos and notes are stored on this device</small></div><span className="noteBadge">{stats.note} notes</span></div>
-          {messages.length===0 ? (
-            <div className="empty"><Camera size={42}/><h3>No memories yet</h3><p>Open the guest experience and leave the first one.</p></div>
+        <section className="panel galleryWorkspace" id="galleryWorkspace">
+          <div className="galleryTopbar">
+            <div><p className="eyebrow">PHASE 3</p><h2>Event Gallery</h2><span>Review, approve, favorite and present your memories.</span></div>
+            <button className="launch" disabled={!slideshowItems.length} onClick={()=>{setSlideIndex(0);setSlideshowOpen(true)}}><MonitorPlay size={18}/> Start slideshow</button>
+          </div>
+
+          <div className="galleryToolbar">
+            <div className="galleryTabs">
+              {[
+                ['all','All'],['favorites','Favorites'],['photos','Photos'],['audio','Voice'],['video','Video'],['notes','Notes']
+              ].map(([key,label])=><button key={key} className={galleryTab===key?'active':''} onClick={()=>setGalleryTab(key)}>{label}</button>)}
+            </div>
+            <label className="gallerySearch"><Search size={17}/><input value={gallerySearch} onChange={e=>setGallerySearch(e.target.value)} placeholder="Search guest names…"/></label>
+          </div>
+
+          <div className="gallerySummary">
+            <span><strong>{galleryItems.length}</strong> shown</span>
+            <span><Check size={15}/> {messages.filter(m=>m.approved).length} approved</span>
+            <span><Star size={15}/> {messages.filter(m=>m.favorite).length} favorites</span>
+            <span><ImageIcon size={15}/> {slideshowItems.length} slideshow photos</span>
+          </div>
+
+          {galleryItems.length===0 ? (
+            <div className="empty"><Images size={42}/><h3>No memories in this view</h3><p>Try a different tab or record a new memory.</p></div>
           ) : (
-            <div className="messageList">
-              {messages.slice(0,20).map(m=>(
-                <div className="message" key={m.id}>
-                  <div className="msgIcon">{m.type==='audio'?<Mic size={19}/>:m.type==='video'?<Video size={19}/>:m.type==='photo'?<Camera size={19}/>:<FileText size={19}/>}</div>
-                  <div><strong>{m.guest}</strong><span>{labelFor(m)}{m.photoBlob && m.type!=='photo'?' · photo attached':''}</span></div>
-                  <time>{m.time}</time>
-                  <div className="messageActions">
-                    <button className={m.favorite?'favorite active':'favorite'} onClick={()=>toggleFavorite(m)} title="Favorite"><Star size={16} fill={m.favorite?'currentColor':'none'}/></button>
-                    <button disabled={!m.playable} onClick={()=>m.playable&&setSelectedMessage(m)}>{m.type==='photo'||m.type==='note'?<Eye size={17}/>:<Play size={17}/>}</button>
-                  </div>
-                </div>
-              ))}
+            <div className="galleryMasonry">
+              {galleryItems.map(m=><GalleryCard key={m.id} item={m} onOpen={()=>setSelectedMessage(m)} onFavorite={()=>toggleFavorite(m)} onApprove={()=>toggleApproval(m)}/>)}
             </div>
           )}
         </section>
       </section>
 
       {selectedMessage && <MemoryViewer message={selectedMessage} onClose={()=>setSelectedMessage(null)}/>}
+      {slideshowOpen&&<Slideshow items={slideshowItems} index={slideIndex} setIndex={setSlideIndex} event={event} onClose={()=>setSlideshowOpen(false)}/>}
     </main>
+  )
+}
+
+function GalleryCard({item,onOpen,onFavorite,onApprove}) {
+  const hasPhoto=!!(item.photoUrl || (item.type==='photo'&&item.url))
+  return (
+    <article className={'galleryCard galleryCard-'+item.type+(item.approved?' approved':'')}>
+      {hasPhoto&&<button className="galleryVisual" onClick={onOpen}><img src={item.photoUrl||item.url} alt={item.guest}/><span className="galleryType">{item.type==='photo'?'Photo':item.type==='audio'?'Voice + Photo':'Video + Photo'}</span></button>}
+      {!hasPhoto&&item.type==='note'&&<button className="galleryNote" onClick={onOpen}><FileText size={22}/><p>“{item.note}”</p></button>}
+      {!hasPhoto&&item.type!=='note'&&<button className="galleryMedia" onClick={onOpen}>{item.type==='audio'?<Mic size={34}/>:<Video size={34}/>}<span>{labelFor(item)}</span><Play size={18}/></button>}
+      <div className="galleryCardMeta">
+        <div><strong>{item.guest}</strong><span>{labelFor(item)} · {item.time}</span></div>
+        <div className="galleryCardActions">
+          <button className={item.favorite?'active':''} onClick={onFavorite} title="Favorite"><Star size={16} fill={item.favorite?'currentColor':'none'}/></button>
+          <button className={item.approved?'approvedBtn active':'approvedBtn'} onClick={onApprove} title={item.approved?'Approved for gallery':'Approve for gallery'}><Check size={16}/></button>
+          <button onClick={onOpen} title="Open"><ChevronRight size={17}/></button>
+        </div>
+      </div>
+    </article>
+  )
+}
+
+function Slideshow({items,index,setIndex,event,onClose}) {
+  if (!items.length) return null
+  const item=items[index%items.length]
+  const src=item.photoUrl||item.url
+  return (
+    <div className={'slideshowScreen theme-'+event.theme} style={{'--accent':event.accent}}>
+      <Atmosphere type={event.ambience} intensity="subtle" subtle/>
+      <button className="slideClose" onClick={onClose}><X size={22}/></button>
+      <div className="slideBrand">{event.logoData?<img src={event.logoData} alt="Event logo"/>:<span>{event.monogram}</span>}</div>
+      <div className="slideImageWrap"><img src={src} alt={item.guest}/></div>
+      <div className="slideCaption"><strong>{item.guest}</strong><span>{event.title} · {event.hashtag}</span></div>
+      <button className="slidePrev" onClick={()=>setIndex(i=>(i-1+items.length)%items.length)}>‹</button>
+      <button className="slideNext" onClick={()=>setIndex(i=>(i+1)%items.length)}>›</button>
+      <div className="slideProgress">{index%items.length+1} / {items.length}</div>
+    </div>
   )
 }
 
