@@ -716,7 +716,7 @@ export default function VoiceMentoPhase1() {
           <span className="phoneBooth">
             <span className="boothTopCap"/><span className="boothCrown">VOICEMENTO</span>
             <span className="boothBody">
-              <span className="boothInterior"><Phone size={48}/><small>STEP INSIDE</small></span>
+              <span className="boothInterior"><VintagePhone compact/><small>STEP INSIDE</small></span>
               <span className="boothDoor boothDoorLeft"><span className="doorGlass"><span/><span/><span/><span/><span/><span/></span><span className="doorPanelDetail"/><span className="doorHandle"/></span>
               <span className="boothDoor boothDoorRight"><span className="doorGlass"><span/><span/><span/><span/><span/><span/></span><span className="doorPanelDetail"/><span className="doorHandle"/></span>
             </span>
@@ -766,7 +766,8 @@ export default function VoiceMentoPhase1() {
 
           {boothStep === 'choose' && (
             <>
-              <p className="phasePrompt">How would you like to leave your memory?</p>
+              <div className="openedBoothPhone"><VintagePhone ringing/></div>
+              <p className="phasePrompt">Pick up a memory and leave something they’ll keep forever.</p>
               {event.greetingData&&<button className="greetingButton" onClick={()=>new Audio(event.greetingData).play().catch(()=>{})}><Volume2 size={17}/> Hear a welcome from the hosts</button>}
               <input className="guestNameInput" value={guestName} onChange={e=>setGuestName(e.target.value)} placeholder="Your name(s) — optional"/>
               <div className="memoryChoices">
@@ -781,7 +782,8 @@ export default function VoiceMentoPhase1() {
 
           {boothStep === 'record' && (
             <>
-              <p className="phasePrompt">{mode==='video'?'Look into the camera and speak from the heart.':'Speak from the heart.'}</p>
+              <p className="phasePrompt">{mode==='video'?'Look into the camera and speak from the heart.':'Speak into the receiver — we’re listening.'}</p>
+              {mode==='audio' && <div className="recordingPhoneWrap"><VintagePhone active/></div>}
               {mode==='video' && <div className="capturePreview"><video ref={videoPreviewRef} muted playsInline/></div>}
               {countdown>0 && <div className="bigCountdown">{countdown}</div>}
               <div className={recording?'timer recording':'timer'}>{String(Math.floor(seconds/60)).padStart(2,'0')}:{String(seconds%60).padStart(2,'0')}</div>
@@ -1098,10 +1100,53 @@ function labelFor(m) {
   return 'Written note'
 }
 
+function VintagePhone({compact=false,ringing=false,active=false}) {
+  return (
+    <div className={'vintagePhone'+(compact?' compact':'')+(ringing?' ringing':'')+(active?' active':'')} aria-hidden="true">
+      <div className="vintagePhoneShadow"/>
+      <div className="vintageHandset">
+        <span className="receiverCup receiverCupLeft"/>
+        <span className="receiverBar"/>
+        <span className="receiverCup receiverCupRight"/>
+      </div>
+      <div className="vintageCradle"><i/><i/></div>
+      <div className="vintageBody">
+        <div className="vintageCrest">VM</div>
+        <div className="rotaryBezel">
+          <div className="rotaryDial">
+            {Array.from({length:10}).map((_,i)=><i key={i} style={{'--n':i}}/> )}
+            <span className="dialCenter"><Phone size={compact?12:17} strokeWidth={1.5}/></span>
+          </div>
+        </div>
+        <div className="vintageNameplate">VOICEMENTO</div>
+      </div>
+      <div className="vintageBase"><span/><span/><span/></div>
+      <div className="phoneCord"/>
+    </div>
+  )
+}
+
 function Atmosphere({type,intensity,subtle}) {
   if (!type || type==='none') return null
   const count = intensity==='subtle'?10:intensity==='festive'?30:18
-  return <div className={'atmosphere atmosphere-'+type+(subtle?' atmosphereSubtle':'')} aria-hidden="true">{Array.from({length:count}).map((_,i)=><i key={i} style={{'--i':i}}/>)}</div>
+  return (
+    <div className={'atmosphere atmosphere-'+type+(subtle?' atmosphereSubtle':'')} aria-hidden="true">
+      {Array.from({length:count}).map((_,i)=>{
+        const left=(i*37+11)%97
+        const duration=8+(i%7)*1.15
+        const delay=-((i*0.83)%duration)
+        const drift=((i%5)-2)*14
+        const scale=.72+(i%6)*.09
+        return <i key={i} style={{
+          left:left+'%',
+          animationDuration:duration+'s',
+          animationDelay:delay+'s',
+          '--drift':drift+'px',
+          '--particle-scale':scale
+        }}/>
+      })}
+    </div>
+  )
 }
 
 function AdminGate({open,onClose,pin,setPin,error,setError,onSubmit}) {
