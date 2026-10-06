@@ -1142,6 +1142,10 @@ function Atmosphere({type,intensity,subtle}) {
           animationDuration:duration+'s',
           animationDelay:delay+'s',
           '--drift':drift+'px',
+          '--drift-neg':(-drift*.7)+'px',
+          '--drift-half':(drift*.55)+'px',
+          '--drift-fire':(drift*.8)+'px',
+          '--drift-fire-neg':(-drift*.3)+'px',
           '--particle-scale':scale
         }}/>
       })}
