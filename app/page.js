@@ -16,6 +16,50 @@ const DEFAULT_EVENT = {
 
 const DEFAULT_ADMIN_PIN = '8886'
 
+function openMessageDb() {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open('voicemento-db', 1)
+    request.onupgradeneeded = () => {
+      const db = request.result
+      if (!db.objectStoreNames.contains('messages')) {
+        db.createObjectStore('messages', { keyPath: 'id' })
+      }
+    }
+    request.onsuccess = () => resolve(request.result)
+    request.onerror = () => reject(request.error)
+  })
+}
+
+async function saveStoredMessage(message) {
+  const db = await openMessageDb()
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction('messages', 'readwrite')
+    tx.objectStore('messages').put(message)
+    tx.oncomplete = () => { db.close(); resolve() }
+    tx.onerror = () => { db.close(); reject(tx.error) }
+  })
+}
+
+async function readStoredMessages() {
+  const db = await openMessageDb()
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction('messages', 'readonly')
+    const request = tx.objectStore('messages').getAll()
+    request.onsuccess = () => {
+      const items = request.result
+        .sort((a,b) => b.id - a.id)
+        .map(item => ({
+          ...item,
+          playable: !!item.blob,
+          url: item.blob ? URL.createObjectURL(item.blob) : null
+        }))
+      db.close()
+      resolve(items)
+    }
+    request.onerror = () => { db.close(); reject(request.error) }
+  })
+}
+
 export default function Home() {
   const [view, setView] = useState('entrance')
   const [entering, setEntering] = useState(false)
@@ -30,15 +74,35 @@ export default function Home() {
   const [pinError, setPinError] = useState(false)
   const [adminPinDraft, setAdminPinDraft] = useState(DEFAULT_ADMIN_PIN)
   const [pinSaved, setPinSaved] = useState(false)
+  const [recordError, setRecordError] = useState('')
+  const [preparing, setPreparing] = useState(false)
+  const [selectedMessage, setSelectedMessage] = useState(null)
   const timerRef = useRef(null)
+  const mediaRecorderRef = useRef(null)
+  const chunksRef = useRef([])
+  const streamRef = useRef(null)
+  const videoPreviewRef = useRef(null)
+  const startedAtRef = useRef(0)
 
   useEffect(() => {
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('./sw.js').catch(() => {})
     }
     try {
-      const savedMessages = localStorage.getItem('voicemento_messages')
-      if (savedMessages) setMessages(JSON.parse(savedMessages))
+      readStoredMessages().then(stored => {
+        if (stored.length) {
+          setMessages(stored)
+          return
+        }
+        const legacy = localStorage.getItem('voicemento_messages')
+        if (legacy) {
+          const demoItems = JSON.parse(legacy).map(item => ({...item, playable:false, legacy:true}))
+          setMessages(demoItems)
+        }
+      }).catch(() => {
+        const legacy = localStorage.getItem('voicemento_messages')
+        if (legacy) setMessages(JSON.parse(legacy).map(item => ({...item, playable:false, legacy:true})))
+      })
       const savedEvent = localStorage.getItem('voicemento_event')
       if (savedEvent) setEvent({ ...DEFAULT_EVENT, ...JSON.parse(savedEvent) })
       const savedPin = localStorage.getItem('voicemento_admin_pin')
@@ -107,29 +171,128 @@ export default function Home() {
     setTimeout(() => setPinSaved(false), 1800)
   }
 
-  function startRecording() {
+  function stopTracks() {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(track => track.stop())
+      streamRef.current = null
+    }
+    if (videoPreviewRef.current) videoPreviewRef.current.srcObject = null
+  }
+
+  function preferredMime(type) {
+    const candidates = type === 'video'
+      ? ['video/mp4', 'video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm']
+      : ['audio/mp4', 'audio/webm;codecs=opus', 'audio/webm', 'audio/ogg;codecs=opus']
+    if (typeof MediaRecorder === 'undefined') return ''
+    return candidates.find(candidate => MediaRecorder.isTypeSupported(candidate)) || ''
+  }
+
+  async function startRecording() {
+    setRecordError('')
     setSeconds(0)
     setComplete(false)
-    setRecording(true)
+    setPreparing(true)
+
+    try {
+      if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === 'undefined') {
+        throw new Error('Recording is not supported by this browser.')
+      }
+
+      const constraints = mode === 'video'
+        ? { audio: true, video: { facingMode: 'user' } }
+        : { audio: true }
+
+      const stream = await navigator.mediaDevices.getUserMedia(constraints)
+      streamRef.current = stream
+
+      if (mode === 'video' && videoPreviewRef.current) {
+        videoPreviewRef.current.srcObject = stream
+        videoPreviewRef.current.muted = true
+        await videoPreviewRef.current.play().catch(() => {})
+      }
+
+      const mimeType = preferredMime(mode)
+      const recorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream)
+      mediaRecorderRef.current = recorder
+      chunksRef.current = []
+      startedAtRef.current = Date.now()
+
+      recorder.ondataavailable = event => {
+        if (event.data && event.data.size > 0) chunksRef.current.push(event.data)
+      }
+
+      recorder.onerror = () => {
+        setRecordError('The recording stopped unexpectedly. Please try again.')
+        setRecording(false)
+        setPreparing(false)
+        stopTracks()
+      }
+
+      recorder.onstop = async () => {
+        const duration = Math.max(1, Math.round((Date.now() - startedAtRef.current) / 1000))
+        const blobType = recorder.mimeType || (mode === 'video' ? 'video/mp4' : 'audio/mp4')
+        const blob = new Blob(chunksRef.current, { type: blobType })
+        stopTracks()
+
+        if (!blob.size) {
+          setRecordError('No audio or video was captured. Please check microphone/camera permission and try again.')
+          setPreparing(false)
+          return
+        }
+
+        const item = {
+          id: Date.now(),
+          type: mode,
+          duration,
+          time: new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}),
+          guest: `Guest ${messages.length + 1}`,
+          mimeType: blob.type,
+          blob
+        }
+
+        try {
+          await saveStoredMessage(item)
+          const playableItem = {...item, playable:true, url:URL.createObjectURL(blob)}
+          setMessages(prev => [playableItem, ...prev])
+          localStorage.removeItem('voicemento_messages')
+          setComplete(true)
+        } catch {
+          setRecordError('The message recorded, but this device could not save it locally.')
+        } finally {
+          setPreparing(false)
+        }
+      }
+
+      recorder.start(250)
+      setRecording(true)
+      setPreparing(false)
+    } catch (error) {
+      stopTracks()
+      setRecording(false)
+      setPreparing(false)
+      if (error?.name === 'NotAllowedError') {
+        setRecordError('Microphone/camera permission was denied. Allow access in Safari settings, then try again.')
+      } else {
+        setRecordError(error?.message || 'Unable to start recording. Please try again.')
+      }
+    }
   }
 
   function stopRecording() {
     setRecording(false)
-    const item = {
-      id: Date.now(),
-      type: mode,
-      duration: seconds || 1,
-      time: new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}),
-      guest: `Guest ${messages.length + 1}`
-    }
-    const next = [item, ...messages]
-    setMessages(next)
-    localStorage.setItem('voicemento_messages', JSON.stringify(next))
-    setComplete(true)
+    const recorder = mediaRecorderRef.current
+    if (recorder && recorder.state !== 'inactive') recorder.stop()
+    else stopTracks()
   }
 
   function resetDemo() {
+    if (mediaRecorderRef.current?.state && mediaRecorderRef.current.state !== 'inactive') {
+      try { mediaRecorderRef.current.stop() } catch {}
+    }
+    stopTracks()
     setRecording(false)
+    setPreparing(false)
+    setRecordError('')
     setSeconds(0)
     setComplete(false)
   }
@@ -204,19 +367,28 @@ export default function Home() {
           <p className="helper">Choose audio or video, then speak from the heart.</p>
 
           <div className="modeRow">
-            <button className={mode==='audio' ? 'mode active' : 'mode'} onClick={() => setMode('audio')} disabled={recording}>
+            <button className={mode==='audio' ? 'mode active' : 'mode'} onClick={() => setMode('audio')} disabled={recording || preparing}>
               <Mic size={22}/><span>Voice message</span>
             </button>
-            <button className={mode==='video' ? 'mode active' : 'mode'} onClick={() => setMode('video')} disabled={recording}>
+            <button className={mode==='video' ? 'mode active' : 'mode'} onClick={() => setMode('video')} disabled={recording || preparing}>
               <Video size={22}/><span>Video message</span>
             </button>
           </div>
+
+          {mode === 'video' && !complete && (
+            <div className={recording ? 'videoPreview live' : 'videoPreview'}>
+              <video ref={videoPreviewRef} muted playsInline />
+              {!recording && <div className="previewPlaceholder"><Video size={24}/><span>Your camera preview appears here</span></div>}
+            </div>
+          )}
+
+          {recordError && <p className="recordError">{recordError}</p>}
 
           {!complete ? (
             <div className="recordArea">
               <div className={recording ? 'timer recording' : 'timer'}>{String(Math.floor(seconds/60)).padStart(2,'0')}:{String(seconds%60).padStart(2,'0')}</div>
               {!recording ? (
-                <button className="recordBtn" onClick={startRecording}><Play size={22} fill="currentColor"/> Begin recording</button>
+                <button className="recordBtn" onClick={startRecording} disabled={preparing}><Play size={22} fill="currentColor"/> {preparing ? 'Preparing…' : 'Begin recording'}</button>
               ) : (
                 <button className="stopBtn" onClick={stopRecording}><Square size={20} fill="currentColor"/> Finish message</button>
               )}
@@ -308,14 +480,18 @@ export default function Home() {
               {messages.slice(0,8).map(m => (
                 <div className="message" key={m.id}>
                   <div className="msgIcon">{m.type==='audio'?<Mic size={19}/>:<Video size={19}/>}</div>
-                  <div><strong>{m.guest}</strong><span>{m.type==='audio'?'Audio message':'Video message'} · {m.duration}s</span></div>
-                  <time>{m.time}</time><button><Play size={17}/></button>
+                  <div><strong>{m.guest}</strong><span>{m.playable ? `${m.type==='audio'?'Audio message':'Video message'} · ${m.duration}s` : 'Old demo entry · no media was captured'}</span></div>
+                  <time>{m.time}</time>
+                  <button disabled={!m.playable} onClick={() => m.playable && setSelectedMessage(m)} title={m.playable ? 'Play message' : 'This older demo entry has no recording'}>
+                    <Play size={17}/>
+                  </button>
                 </div>
               ))}
             </div>
           )}
         </section>
       </section>
+      {selectedMessage && <MediaPlayer message={selectedMessage} onClose={() => setSelectedMessage(null)} />}
     </main>
   )
 }
@@ -339,6 +515,26 @@ function AdminGate({open,onClose,pin,setPin,error,setError,onSubmit}) {
         {error && <span className="pinError">That code isn't correct.</span>}
         <button className="unlockBtn" type="submit">Unlock dashboard</button>
       </form>
+    </div>
+  )
+}
+
+function MediaPlayer({message,onClose}) {
+  return (
+    <div className="modalBackdrop" onMouseDown={onClose}>
+      <div className="playerModal" onMouseDown={e=>e.stopPropagation()}>
+        <button className="modalClose" onClick={onClose}><X size={19}/></button>
+        <p className="tinyLabel">{message.type === 'video' ? 'VIDEO MESSAGE' : 'VOICE MESSAGE'}</p>
+        <h2>{message.guest}</h2>
+        <p className="playerMeta">{message.time} · {message.duration}s</p>
+        {message.type === 'video'
+          ? <video className="mediaPlayer" src={message.url} controls autoPlay playsInline />
+          : <audio className="mediaPlayer audioPlayer" src={message.url} controls autoPlay />
+        }
+        <a className="downloadMedia" href={message.url} download={`VoiceMento-${message.id}.${message.type === 'video' ? 'mp4' : 'm4a'}`}>
+          <Download size={17}/> Save this message
+        </a>
+      </div>
     </div>
   )
 }
