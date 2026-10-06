@@ -21,6 +21,12 @@ export default function Home() {
   const timerRef = useRef(null)
 
   useEffect(() => {
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('./sw.js').catch(() => {})
+    }
+  }, [])
+
+  useEffect(() => {
     const saved = localStorage.getItem('voicemento_messages')
     if (saved) setMessages(JSON.parse(saved))
   }, [])
