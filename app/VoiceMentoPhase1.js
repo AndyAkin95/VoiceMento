@@ -1,0 +1,806 @@
+'use client'
+
+import { useEffect, useMemo, useRef, useState } from 'react'
+import {
+  Phone, Mic, Video, Heart, Settings, Play, Square, RotateCcw,
+  QrCode, Images, CalendarDays, Users, Download, ChevronLeft,
+  Camera, CheckCircle2, LockKeyhole, X, Sparkles, LogOut,
+  FileText, Image as ImageIcon, SwitchCamera, Eye, Save, SkipForward
+} from 'lucide-react'
+
+const DEFAULT_EVENT = {
+  title: 'Olivia & James',
+  subtitle: 'October 18, 2026',
+  prompt: "Leave us a message we'll keep forever",
+  accent: '#B58B6A',
+  ambience: 'rose',
+  ambienceIntensity: 'normal'
+}
+
+const DEFAULT_ADMIN_PIN = '8886'
+const RESET_SECONDS = 8
+
+function openDb() {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open('voicemento-db', 2)
+    request.onupgradeneeded = () => {
+      const db = request.result
+      if (!db.objectStoreNames.contains('messages')) db.createObjectStore('messages', { keyPath: 'id' })
+    }
+    request.onsuccess = () => resolve(request.result)
+    request.onerror = () => reject(request.error)
+  })
+}
+
+async function dbPut(item) {
+  const db = await openDb()
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction('messages', 'readwrite')
+    tx.objectStore('messages').put(item)
+    tx.oncomplete = () => { db.close(); resolve() }
+    tx.onerror = () => { db.close(); reject(tx.error) }
+  })
+}
+
+async function dbGetAll() {
+  const db = await openDb()
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction('messages', 'readonly')
+    const req = tx.objectStore('messages').getAll()
+    req.onsuccess = () => {
+      const items = req.result.sort((a,b) => b.id - a.id).map(hydrateItem)
+      db.close()
+      resolve(items)
+    }
+    req.onerror = () => { db.close(); reject(req.error) }
+  })
+}
+
+function hydrateItem(item) {
+  return {
+    ...item,
+    playable: !!item.blob || !!item.photoBlob || !!item.note,
+    url: item.blob ? URL.createObjectURL(item.blob) : null,
+    photoUrl: item.photoBlob ? URL.createObjectURL(item.photoBlob) : null
+  }
+}
+
+function stopStream(ref, videoRef) {
+  if (ref.current) {
+    ref.current.getTracks().forEach(t => t.stop())
+    ref.current = null
+  }
+  if (videoRef.current) videoRef.current.srcObject = null
+}
+
+function bestMime(type) {
+  if (typeof MediaRecorder === 'undefined') return ''
+  const candidates = type === 'video'
+    ? ['video/mp4','video/webm;codecs=vp9,opus','video/webm;codecs=vp8,opus','video/webm']
+    : ['audio/mp4','audio/webm;codecs=opus','audio/webm']
+  return candidates.find(x => MediaRecorder.isTypeSupported(x)) || ''
+}
+
+export default function VoiceMentoPhase1() {
+  const [view, setView] = useState('entrance')
+  const [entering, setEntering] = useState(false)
+  const [event, setEvent] = useState(DEFAULT_EVENT)
+  const [messages, setMessages] = useState([])
+  const [guestName, setGuestName] = useState('')
+  const [boothStep, setBoothStep] = useState('choose')
+  const [mode, setMode] = useState(null)
+  const [recording, setRecording] = useState(false)
+  const [preparing, setPreparing] = useState(false)
+  const [seconds, setSeconds] = useState(0)
+  const [countdown, setCountdown] = useState(0)
+  const [recordError, setRecordError] = useState('')
+  const [pending, setPending] = useState(null)
+  const [attachedPhoto, setAttachedPhoto] = useState(null)
+  const [photoCount, setPhotoCount] = useState(1)
+  const [photoShots, setPhotoShots] = useState([])
+  const [cameraFacing, setCameraFacing] = useState('user')
+  const [noteText, setNoteText] = useState('')
+  const [resetCountdown, setResetCountdown] = useState(RESET_SECONDS)
+  const [selectedMessage, setSelectedMessage] = useState(null)
+
+  const [showAdminGate, setShowAdminGate] = useState(false)
+  const [pin, setPin] = useState('')
+  const [pinError, setPinError] = useState(false)
+  const [adminPinDraft, setAdminPinDraft] = useState(DEFAULT_ADMIN_PIN)
+  const [pinSaved, setPinSaved] = useState(false)
+
+  const timerRef = useRef(null)
+  const mediaRecorderRef = useRef(null)
+  const chunksRef = useRef([])
+  const streamRef = useRef(null)
+  const videoPreviewRef = useRef(null)
+  const startedAtRef = useRef(0)
+  const attractRef = useRef(null)
+
+  useEffect(() => {
+    if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js').catch(() => {})
+    try {
+      const savedEvent = localStorage.getItem('voicemento_event')
+      if (savedEvent) setEvent({ ...DEFAULT_EVENT, ...JSON.parse(savedEvent) })
+      const savedPin = localStorage.getItem('voicemento_admin_pin')
+      if (!savedPin || savedPin === '2468') {
+        localStorage.setItem('voicemento_admin_pin', DEFAULT_ADMIN_PIN)
+        setAdminPinDraft(DEFAULT_ADMIN_PIN)
+      } else setAdminPinDraft(savedPin)
+    } catch {}
+    dbGetAll().then(setMessages).catch(() => {})
+  }, [])
+
+  useEffect(() => {
+    if (recording) timerRef.current = setInterval(() => setSeconds(s => s + 1), 1000)
+    else if (timerRef.current) clearInterval(timerRef.current)
+    return () => timerRef.current && clearInterval(timerRef.current)
+  }, [recording])
+
+  useEffect(() => {
+    const activity = () => {
+      if (attractRef.current) clearTimeout(attractRef.current)
+      if (view === 'booth' && boothStep === 'choose' && !recording && !preparing) {
+        attractRef.current = setTimeout(() => exitToEntrance(), 30000)
+      }
+    }
+    activity()
+    window.addEventListener('pointerdown', activity)
+    window.addEventListener('keydown', activity)
+    return () => {
+      window.removeEventListener('pointerdown', activity)
+      window.removeEventListener('keydown', activity)
+      if (attractRef.current) clearTimeout(attractRef.current)
+    }
+  }, [view, boothStep, recording, preparing])
+
+  useEffect(() => {
+    if (boothStep !== 'saved') return
+    setResetCountdown(RESET_SECONDS)
+    const interval = setInterval(() => {
+      setResetCountdown(v => {
+        if (v <= 1) {
+          clearInterval(interval)
+          exitToEntrance()
+          return 0
+        }
+        return v - 1
+      })
+    }, 1000)
+    return () => clearInterval(interval)
+  }, [boothStep])
+
+  const stats = useMemo(() => ({
+    total: messages.length,
+    audio: messages.filter(m => m.type === 'audio').length,
+    video: messages.filter(m => m.type === 'video').length,
+    photo: messages.filter(m => m.type === 'photo').length,
+    note: messages.filter(m => m.type === 'note').length
+  }), [messages])
+
+  function saveEvent(next) {
+    setEvent(next)
+    try { localStorage.setItem('voicemento_event', JSON.stringify(next)) } catch {}
+  }
+
+  function openAdmin() {
+    setPin('')
+    setPinError(false)
+    setShowAdminGate(true)
+  }
+
+  function submitAdmin(e) {
+    e.preventDefault()
+    const current = localStorage.getItem('voicemento_admin_pin') || DEFAULT_ADMIN_PIN
+    if (pin === current) {
+      setShowAdminGate(false)
+      setView('admin')
+      setPin('')
+    } else {
+      setPinError(true)
+      setPin('')
+    }
+  }
+
+  function saveAdminPin() {
+    const clean = adminPinDraft.replace(/\D/g,'').slice(0,8)
+    if (clean.length < 4) return
+    localStorage.setItem('voicemento_admin_pin', clean)
+    setAdminPinDraft(clean)
+    setPinSaved(true)
+    setTimeout(() => setPinSaved(false), 1500)
+  }
+
+  function resetGuestSession() {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+      try { mediaRecorderRef.current.stop() } catch {}
+    }
+    stopStream(streamRef, videoPreviewRef)
+    setGuestName('')
+    setBoothStep('choose')
+    setMode(null)
+    setRecording(false)
+    setPreparing(false)
+    setSeconds(0)
+    setCountdown(0)
+    setRecordError('')
+    setPending(null)
+    setAttachedPhoto(null)
+    setPhotoShots([])
+    setPhotoCount(1)
+    setNoteText('')
+  }
+
+  function exitToEntrance() {
+    resetGuestSession()
+    setView('entrance')
+  }
+
+  function enterBooth() {
+    if (entering) return
+    setEntering(true)
+    setTimeout(() => {
+      resetGuestSession()
+      setView('booth')
+      setEntering(false)
+    }, 1700)
+  }
+
+  async function runCountdown() {
+    for (const n of [3,2,1]) {
+      setCountdown(n)
+      await new Promise(r => setTimeout(r, 750))
+    }
+    setCountdown(0)
+  }
+
+  async function beginMedia(type) {
+    setMode(type)
+    setRecordError('')
+    setPreparing(true)
+    setSeconds(0)
+    setBoothStep('record')
+    try {
+      if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === 'undefined') {
+        throw new Error('Recording is not supported on this device.')
+      }
+      const constraints = type === 'video'
+        ? { audio:true, video:{ facingMode:'user', width:{ideal:1280}, height:{ideal:720} } }
+        : { audio:true }
+      const stream = await navigator.mediaDevices.getUserMedia(constraints)
+      streamRef.current = stream
+      if (type === 'video' && videoPreviewRef.current) {
+        videoPreviewRef.current.srcObject = stream
+        videoPreviewRef.current.muted = true
+        await videoPreviewRef.current.play().catch(() => {})
+        await runCountdown()
+      }
+      const mime = bestMime(type)
+      const recorder = mime ? new MediaRecorder(stream,{mimeType:mime}) : new MediaRecorder(stream)
+      mediaRecorderRef.current = recorder
+      chunksRef.current = []
+      recorder.ondataavailable = e => { if (e.data && e.data.size) chunksRef.current.push(e.data) }
+      recorder.onerror = () => {
+        setRecordError('The recording stopped unexpectedly. Please try again.')
+        setRecording(false)
+        setPreparing(false)
+        stopStream(streamRef, videoPreviewRef)
+      }
+      recorder.onstop = () => {
+        const duration = Math.max(1,Math.round((Date.now()-startedAtRef.current)/1000))
+        const blob = new Blob(chunksRef.current,{type:recorder.mimeType || (type==='video'?'video/mp4':'audio/mp4')})
+        stopStream(streamRef, videoPreviewRef)
+        if (!blob.size) {
+          setRecordError('No media was captured. Check permissions and try again.')
+          setBoothStep('choose')
+          return
+        }
+        setPending({
+          type,
+          blob,
+          url:URL.createObjectURL(blob),
+          duration,
+          time:new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})
+        })
+        setBoothStep('review')
+      }
+      startedAtRef.current = Date.now()
+      recorder.start(250)
+      setRecording(true)
+      setPreparing(false)
+    } catch (err) {
+      stopStream(streamRef, videoPreviewRef)
+      setRecording(false)
+      setPreparing(false)
+      setBoothStep('choose')
+      if (err && err.name === 'NotAllowedError') setRecordError('Camera or microphone permission was denied. Allow access in Safari Settings and try again.')
+      else setRecordError((err && err.message) || 'Unable to start.')
+    }
+  }
+
+  function finishMedia() {
+    setRecording(false)
+    const recorder = mediaRecorderRef.current
+    if (recorder && recorder.state !== 'inactive') recorder.stop()
+  }
+
+  async function openPhotoCapture(count, asAttachment) {
+    setMode(asAttachment ? 'attachment' : 'photo')
+    setPhotoCount(count || 1)
+    setPhotoShots([])
+    setRecordError('')
+    setBoothStep('photo')
+    setPreparing(true)
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio:false,
+        video:{ facingMode:cameraFacing, width:{ideal:1280}, height:{ideal:960} }
+      })
+      streamRef.current = stream
+      if (videoPreviewRef.current) {
+        videoPreviewRef.current.srcObject = stream
+        videoPreviewRef.current.muted = true
+        await videoPreviewRef.current.play().catch(() => {})
+      }
+      setPreparing(false)
+    } catch (err) {
+      setPreparing(false)
+      setBoothStep(asAttachment ? 'review' : 'choose')
+      setRecordError(err && err.name === 'NotAllowedError' ? 'Camera permission was denied.' : 'Unable to open the camera.')
+    }
+  }
+
+  async function switchCamera() {
+    const next = cameraFacing === 'user' ? 'environment' : 'user'
+    setCameraFacing(next)
+    stopStream(streamRef, videoPreviewRef)
+    setPreparing(true)
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({video:{facingMode:next},audio:false})
+      streamRef.current = stream
+      if (videoPreviewRef.current) {
+        videoPreviewRef.current.srcObject = stream
+        videoPreviewRef.current.muted = true
+        await videoPreviewRef.current.play().catch(() => {})
+      }
+    } catch {
+      setRecordError('Could not switch cameras.')
+    } finally {
+      setPreparing(false)
+    }
+  }
+
+  function canvasBlob(canvas, quality) {
+    return new Promise(resolve => canvas.toBlob(resolve,'image/jpeg',quality || .9))
+  }
+
+  async function captureFrame() {
+    await runCountdown()
+    const video = videoPreviewRef.current
+    if (!video || !video.videoWidth) return
+    const maxW = 960
+    const scale = Math.min(1,maxW/video.videoWidth)
+    const canvas = document.createElement('canvas')
+    canvas.width = Math.round(video.videoWidth*scale)
+    canvas.height = Math.round(video.videoHeight*scale)
+    const ctx = canvas.getContext('2d')
+    if (cameraFacing === 'user') {
+      ctx.translate(canvas.width,0)
+      ctx.scale(-1,1)
+    }
+    ctx.drawImage(video,0,0,canvas.width,canvas.height)
+    const blob = await canvasBlob(canvas,.88)
+    const next = [...photoShots,blob]
+    setPhotoShots(next)
+    if (next.length >= photoCount) {
+      stopStream(streamRef, videoPreviewRef)
+      const finalBlob = photoCount === 1 ? next[0] : await buildStrip(next)
+      const url = URL.createObjectURL(finalBlob)
+      if (mode === 'attachment') {
+        setAttachedPhoto({blob:finalBlob,url})
+        setBoothStep('review')
+      } else {
+        setPending({
+          type:'photo',
+          blob:finalBlob,
+          url,
+          duration:0,
+          photoCount,
+          time:new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})
+        })
+        setBoothStep('review')
+      }
+    }
+  }
+
+  async function buildStrip(blobs) {
+    const images = await Promise.all(blobs.map(blob => new Promise(resolve => {
+      const img = new Image()
+      img.onload = () => resolve(img)
+      img.src = URL.createObjectURL(blob)
+    })))
+    const width = 720
+    const gap = 18
+    const pad = 28
+    const frameH = 540
+    const canvas = document.createElement('canvas')
+    canvas.width = width + pad*2
+    canvas.height = pad*2 + images.length*frameH + (images.length-1)*gap + 100
+    const ctx = canvas.getContext('2d')
+    ctx.fillStyle = '#fffaf4'
+    ctx.fillRect(0,0,canvas.width,canvas.height)
+    images.forEach((img,i) => {
+      const y = pad + i*(frameH+gap)
+      const scale = Math.max(width/img.width,frameH/img.height)
+      const dw = img.width*scale
+      const dh = img.height*scale
+      ctx.save()
+      ctx.beginPath()
+      ctx.rect(pad,y,width,frameH)
+      ctx.clip()
+      ctx.drawImage(img,pad+(width-dw)/2,y+(frameH-dh)/2,dw,dh)
+      ctx.restore()
+    })
+    ctx.fillStyle = '#8e6d56'
+    ctx.textAlign = 'center'
+    ctx.font = '32px Georgia'
+    ctx.fillText(event.title,canvas.width/2,canvas.height-58)
+    ctx.font = '18px Georgia'
+    ctx.fillText(event.subtitle,canvas.width/2,canvas.height-26)
+    return await canvasBlob(canvas,.9)
+  }
+
+  function startNote() {
+    setMode('note')
+    setNoteText('')
+    setPending(null)
+    setBoothStep('note')
+  }
+
+  function reviewNote() {
+    if (!noteText.trim()) return
+    setPending({
+      type:'note',
+      note:noteText.trim(),
+      duration:0,
+      time:new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})
+    })
+    setBoothStep('review')
+  }
+
+  function retake() {
+    if (pending && pending.url) URL.revokeObjectURL(pending.url)
+    setPending(null)
+    setAttachedPhoto(null)
+    setRecordError('')
+    if (mode === 'audio' || mode === 'video') beginMedia(mode)
+    else if (mode === 'photo') openPhotoCapture(photoCount,false)
+    else if (mode === 'note') setBoothStep('note')
+    else setBoothStep('choose')
+  }
+
+  async function savePending() {
+    if (!pending) return
+    const item = {
+      id:Date.now(),
+      type:pending.type,
+      guest:(guestName || '').trim() || 'Guest ' + (messages.length+1),
+      time:pending.time,
+      duration:pending.duration || 0,
+      blob:pending.type === 'note' ? null : pending.blob,
+      note:pending.note || null,
+      photoBlob:attachedPhoto ? attachedPhoto.blob : (pending.type === 'photo' ? pending.blob : null),
+      photoCount:pending.photoCount || 0,
+      createdAt:new Date().toISOString()
+    }
+    try {
+      await dbPut(item)
+      setMessages(prev => [hydrateItem(item),...prev])
+      setBoothStep('saved')
+    } catch {
+      setRecordError('This message was captured but could not be saved on this device.')
+    }
+  }
+
+  function removeAttachment() {
+    if (attachedPhoto && attachedPhoto.url) URL.revokeObjectURL(attachedPhoto.url)
+    setAttachedPhoto(null)
+  }
+
+  if (view === 'entrance') {
+    return (
+      <main className={'weddingEntrance ambience-' + event.ambience + ' intensity-' + event.ambienceIntensity + (entering?' entering':'')} style={{'--accent':event.accent}}>
+        <div className="paperTexture"/>
+        <Atmosphere type={event.ambience} intensity={event.ambienceIntensity}/>
+        <button className="adminLock" onClick={openAdmin}><LockKeyhole size={16}/> Admin</button>
+        <section className="entranceCopy">
+          <div className="monogram"><span>V</span><Heart size={14} fill="currentColor"/><span>M</span></div>
+          <p className="scriptLine">A little piece of tonight, forever.</p>
+          <h1>{event.title}</h1>
+          <div className="ornament"><span/><Sparkles size={16}/><span/></div>
+          <p className="eventDate">{event.subtitle}</p>
+          <p className="entranceHint">Tap the booth and leave a memory for the happy couple.</p>
+        </section>
+        <button className="boothStage" onClick={enterBooth} aria-label="Enter VoiceMento">
+          <span className="floorShadow"/><span className="boothGlow"/>
+          <span className="phoneBooth">
+            <span className="boothTopCap"/><span className="boothCrown">VOICEMENTO</span>
+            <span className="boothBody">
+              <span className="boothInterior"><Phone size={48}/><small>STEP INSIDE</small></span>
+              <span className="boothDoor boothDoorLeft"><span className="doorGlass"><span/><span/><span/><span/><span/><span/></span><span className="doorPanelDetail"/><span className="doorHandle"/></span>
+              <span className="boothDoor boothDoorRight"><span className="doorGlass"><span/><span/><span/><span/><span/><span/></span><span className="doorPanelDetail"/><span className="doorHandle"/></span>
+            </span>
+            <span className="boothBase"/>
+          </span>
+          <span className="tapLabel">{entering?'Come on in…':'Tap the booth to enter'}</span>
+        </button>
+        <p className="poweredBy">VOICEMENTO · DIGITAL EVENT GUESTBOOK</p>
+        <AdminGate open={showAdminGate} onClose={()=>setShowAdminGate(false)} pin={pin} setPin={setPin} error={pinError} setError={setPinError} onSubmit={submitAdmin}/>
+      </main>
+    )
+  }
+
+  if (view === 'booth') {
+    return (
+      <main className={'boothExperience ambience-' + event.ambience + ' intensity-' + event.ambienceIntensity} style={{'--accent':event.accent}}>
+        <Atmosphere type={event.ambience} intensity={event.ambienceIntensity} subtle/>
+        <div className="floralCorner floralTop"/><div className="floralCorner floralBottom"/>
+        <button className="guestExit" onClick={exitToEntrance}><ChevronLeft size={19}/> Exit booth</button>
+        <button className="adminLock boothAdmin" onClick={openAdmin}><LockKeyhole size={16}/> Admin</button>
+
+        <section className="phaseCard">
+          <div className="cardMonogram">V<span>♥</span>M</div>
+          <p className="tinyLabel">A MEMORY FOR</p>
+          <h1>{event.title}</h1>
+
+          {boothStep === 'choose' && (
+            <>
+              <p className="phasePrompt">How would you like to leave your memory?</p>
+              <input className="guestNameInput" value={guestName} onChange={e=>setGuestName(e.target.value)} placeholder="Your name(s) — optional"/>
+              <div className="memoryChoices">
+                <button onClick={()=>beginMedia('audio')}><Mic/><strong>Voice</strong><span>Leave a heartfelt message</span></button>
+                <button onClick={()=>beginMedia('video')}><Video/><strong>Video</strong><span>Record a video message</span></button>
+                <button onClick={()=>openPhotoCapture(1,false)}><Camera/><strong>Photo Booth</strong><span>Single photo or photo strip</span></button>
+                <button onClick={startNote}><FileText/><strong>Written Note</strong><span>Write something they can keep</span></button>
+              </div>
+              {recordError && <p className="recordError">{recordError}</p>}
+            </>
+          )}
+
+          {boothStep === 'record' && (
+            <>
+              <p className="phasePrompt">{mode==='video'?'Look into the camera and speak from the heart.':'Speak from the heart.'}</p>
+              {mode==='video' && <div className="capturePreview"><video ref={videoPreviewRef} muted playsInline/></div>}
+              {countdown>0 && <div className="bigCountdown">{countdown}</div>}
+              <div className={recording?'timer recording':'timer'}>{String(Math.floor(seconds/60)).padStart(2,'0')}:{String(seconds%60).padStart(2,'0')}</div>
+              {preparing && <p className="helper">Preparing camera…</p>}
+              {recording && <button className="stopBtn" onClick={finishMedia}><Square size={20} fill="currentColor"/> Finish message</button>}
+              {recordError && <p className="recordError">{recordError}</p>}
+            </>
+          )}
+
+          {boothStep === 'photo' && (
+            <>
+              <p className="phasePrompt">{mode==='attachment'?'Add a photo to your message':'Photo Booth · ' + photoShots.length + ' of ' + photoCount + ' captured'}</p>
+              <div className="capturePreview">
+                <video ref={videoPreviewRef} muted playsInline/>
+                {countdown>0 && <div className="bigCountdown">{countdown}</div>}
+              </div>
+              <div className="captureActions">
+                <button className="secondary" onClick={switchCamera}><SwitchCamera size={18}/> Flip camera</button>
+                <button className="recordBtn" onClick={captureFrame} disabled={preparing}><Camera size={20}/> {photoShots.length+1 < photoCount?'Take next photo':'Take photo'}</button>
+              </div>
+              {recordError && <p className="recordError">{recordError}</p>}
+            </>
+          )}
+
+          {boothStep === 'note' && (
+            <>
+              <p className="phasePrompt">Write a note they can revisit for years.</p>
+              <textarea className="noteComposer" value={noteText} onChange={e=>setNoteText(e.target.value)} maxLength={1200} placeholder="Write your message here…"/>
+              <div className="noteCount">{noteText.length}/1200</div>
+              <button className="recordBtn" onClick={reviewNote} disabled={!noteText.trim()}><Eye size={19}/> Review note</button>
+            </>
+          )}
+
+          {boothStep === 'review' && pending && (
+            <>
+              <p className="phasePrompt">Review your memory before saving it.</p>
+              <div className="reviewMedia">
+                {pending.type==='audio' && <audio src={pending.url} controls/>}
+                {pending.type==='video' && <video src={pending.url} controls playsInline/>}
+                {pending.type==='photo' && <img src={pending.url} alt="Photo booth preview"/>}
+                {pending.type==='note' && <div className="noteReview">“{pending.note}”</div>}
+              </div>
+
+              {(pending.type==='audio' || pending.type==='video') && (
+                <div className="photoAttachment">
+                  {attachedPhoto ? (
+                    <div className="attachedPreview">
+                      <img src={attachedPhoto.url} alt="Attached guest photo"/>
+                      <button onClick={removeAttachment}><X size={16}/> Remove photo</button>
+                    </div>
+                  ) : (
+                    <button className="secondary addPhotoBtn" onClick={()=>openPhotoCapture(1,true)}><Camera size={18}/> Add a photo to this message</button>
+                  )}
+                </div>
+              )}
+
+              <div className="reviewActions">
+                <button className="secondary" onClick={retake}><RotateCcw size={18}/> Retake</button>
+                <button className="recordBtn" onClick={savePending}><Save size={19}/> Keep it</button>
+              </div>
+            </>
+          )}
+
+          {boothStep === 'saved' && (
+            <div className="savedMoment">
+              <CheckCircle2 size={48}/>
+              <h2>Added to their story.</h2>
+              <p>Thank you{guestName.trim()?' '+guestName.trim():''}. Returning to the booth in {resetCountdown}s.</p>
+              <button className="secondary" onClick={exitToEntrance}><SkipForward size={18}/> Done</button>
+            </div>
+          )}
+
+          {boothStep==='choose' && (
+            <div className="photoStripPicker">
+              <span>Photo Booth style:</span>
+              {[1,3,4].map(n=><button key={n} className={photoCount===n?'active':''} onClick={()=>setPhotoCount(n)}>{n===1?'Single':n+'-Photo Strip'}</button>)}
+              {photoCount!==1 && <button className="secondary compact" onClick={()=>openPhotoCapture(photoCount,false)}>Start {photoCount}-photo strip</button>}
+            </div>
+          )}
+        </section>
+        <AdminGate open={showAdminGate} onClose={()=>setShowAdminGate(false)} pin={pin} setPin={setPin} error={pinError} setError={setPinError} onSubmit={submitAdmin}/>
+      </main>
+    )
+  }
+
+  return (
+    <main className="appShell">
+      <aside className="sidebar">
+        <div className="brand"><div className="brandMark"><Phone size={23}/></div><div><strong>VoiceMento</strong><span>Events</span></div></div>
+        <nav>
+          <button className="nav active"><CalendarDays size={20}/> Event</button>
+          <button className="nav"><Images size={20}/> Gallery</button>
+          <button className="nav"><Users size={20}/> Guests</button>
+          <button className="nav"><Settings size={20}/> Settings</button>
+        </nav>
+        <button className="lockOut" onClick={()=>setView('entrance')}><LogOut size={18}/> Lock admin</button>
+      </aside>
+
+      <section className="content">
+        <header>
+          <div><div className="eyebrow">EVENT DASHBOARD</div><h1>{event.title}</h1><p>{event.subtitle}</p></div>
+          <button className="launch" onClick={()=>setView('entrance')}><Play size={18} fill="currentColor"/> Preview guest experience</button>
+        </header>
+
+        <div className="statsGrid phaseStats">
+          <Stat icon={<Heart/>} label="All memories" value={stats.total}/>
+          <Stat icon={<Mic/>} label="Voice" value={stats.audio}/>
+          <Stat icon={<Video/>} label="Video" value={stats.video}/>
+          <Stat icon={<Camera/>} label="Photos" value={stats.photo}/>
+        </div>
+
+        <div className="grid2">
+          <section className="panel">
+            <div className="panelHead"><div><span>Event styling</span><small>Customize what guests see</small></div><Settings size={20}/></div>
+            <label>Couple / event name<input value={event.title} onChange={e=>saveEvent({...event,title:e.target.value})}/></label>
+            <label>Date / subtitle<input value={event.subtitle} onChange={e=>saveEvent({...event,subtitle:e.target.value})}/></label>
+            <label>Recording prompt<textarea value={event.prompt} onChange={e=>saveEvent({...event,prompt:e.target.value})}/></label>
+            <label>Wedding accent<div className="colorRow"><input type="color" value={event.accent} onChange={e=>saveEvent({...event,accent:e.target.value})}/><span>{event.accent}</span></div></label>
+          </section>
+
+          <section className="panel">
+            <div className="panelHead"><div><span>Atmosphere</span><small>Change the animated event ambience</small></div><Sparkles size={20}/></div>
+            <label>Effect
+              <select value={event.ambience} onChange={e=>saveEvent({...event,ambience:e.target.value})}>
+                <option value="rose">Rose Petals</option>
+                <option value="leaves">Autumn Leaves</option>
+                <option value="blossoms">Cherry Blossoms</option>
+                <option value="snow">Snow</option>
+                <option value="confetti">Gold Confetti</option>
+                <option value="sparkles">Sparkles</option>
+                <option value="fireflies">Fireflies</option>
+                <option value="none">None</option>
+              </select>
+            </label>
+            <label>Intensity
+              <div className="segmentControl">
+                {['subtle','normal','festive'].map(x=><button key={x} className={event.ambienceIntensity===x?'active':''} onClick={()=>saveEvent({...event,ambienceIntensity:x})}>{x[0].toUpperCase()+x.slice(1)}</button>)}
+              </div>
+            </label>
+            <div className={'ambienceDemo ambience-' + event.ambience + ' intensity-' + event.ambienceIntensity}><Atmosphere type={event.ambience} intensity={event.ambienceIntensity}/><span>Live preview</span></div>
+          </section>
+        </div>
+
+        <div className="grid2 adminSecondRow">
+          <section className="panel">
+            <div className="panelHead"><div><span>Admin security</span><small>Change the dashboard PIN</small></div><LockKeyhole size={20}/></div>
+            <label>Admin PIN<input inputMode="numeric" maxLength={8} value={adminPinDraft} onChange={e=>setAdminPinDraft(e.target.value.replace(/\D/g,''))}/></label>
+            <button className="secondary" onClick={saveAdminPin}>{pinSaved?'Saved ✓':'Save admin PIN'}</button>
+            <p className="securityNote">Default PIN: 8886</p>
+          </section>
+          <section className="panel miniPreview">
+            <p className="tinyLabel">PHASE 1 ACTIVE</p>
+            <div className="phaseFeatureIcons"><Mic/><Video/><Camera/><FileText/></div>
+            <h3>Four ways to leave a memory</h3>
+            <p>Voice, video, photo booth and written notes — with names, countdowns, review and retake.</p>
+          </section>
+        </div>
+
+        <section className="panel messagesPanel">
+          <div className="panelHead"><div><span>Recent memories</span><small>New recordings, photos and notes are stored on this device</small></div><span className="noteBadge">{stats.note} notes</span></div>
+          {messages.length===0 ? (
+            <div className="empty"><Camera size={42}/><h3>No memories yet</h3><p>Open the guest experience and leave the first one.</p></div>
+          ) : (
+            <div className="messageList">
+              {messages.slice(0,20).map(m=>(
+                <div className="message" key={m.id}>
+                  <div className="msgIcon">{m.type==='audio'?<Mic size={19}/>:m.type==='video'?<Video size={19}/>:m.type==='photo'?<Camera size={19}/>:<FileText size={19}/>}</div>
+                  <div><strong>{m.guest}</strong><span>{labelFor(m)}{m.photoBlob && m.type!=='photo'?' · photo attached':''}</span></div>
+                  <time>{m.time}</time>
+                  <button disabled={!m.playable} onClick={()=>m.playable&&setSelectedMessage(m)}>{m.type==='photo'||m.type==='note'?<Eye size={17}/>:<Play size={17}/>}</button>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+      </section>
+
+      {selectedMessage && <MemoryViewer message={selectedMessage} onClose={()=>setSelectedMessage(null)}/>}
+    </main>
+  )
+}
+
+function labelFor(m) {
+  if (m.type==='audio') return 'Voice message · '+(m.duration||0)+'s'
+  if (m.type==='video') return 'Video message · '+(m.duration||0)+'s'
+  if (m.type==='photo') return (m.photoCount>1?m.photoCount+'-photo strip':'Photo')
+  return 'Written note'
+}
+
+function Atmosphere({type,intensity,subtle}) {
+  if (!type || type==='none') return null
+  const count = intensity==='subtle'?10:intensity==='festive'?30:18
+  return <div className={'atmosphere atmosphere-'+type+(subtle?' atmosphereSubtle':'')} aria-hidden="true">{Array.from({length:count}).map((_,i)=><i key={i} style={{'--i':i}}/>)}</div>
+}
+
+function AdminGate({open,onClose,pin,setPin,error,setError,onSubmit}) {
+  if (!open) return null
+  return (
+    <div className="modalBackdrop" onMouseDown={onClose}>
+      <form className={error?'pinModal shake':'pinModal'} onSubmit={onSubmit} onMouseDown={e=>e.stopPropagation()}>
+        <button type="button" className="modalClose" onClick={onClose}><X size={19}/></button>
+        <div className="lockSeal"><LockKeyhole size={24}/></div>
+        <p className="tinyLabel">PRIVATE AREA</p>
+        <h2>Admin access</h2>
+        <p>Enter the event administrator code.</p>
+        <input autoFocus inputMode="numeric" type="password" maxLength={8} value={pin} onChange={e=>{setPin(e.target.value.replace(/\D/g,''));setError(false)}} placeholder="••••"/>
+        {error&&<span className="pinError">That code isn't correct.</span>}
+        <button className="unlockBtn" type="submit">Unlock dashboard</button>
+      </form>
+    </div>
+  )
+}
+
+function MemoryViewer({message,onClose}) {
+  return (
+    <div className="modalBackdrop" onMouseDown={onClose}>
+      <div className="playerModal" onMouseDown={e=>e.stopPropagation()}>
+        <button className="modalClose" onClick={onClose}><X size={19}/></button>
+        <p className="tinyLabel">{labelFor(message)}</p>
+        <h2>{message.guest}</h2>
+        {message.type==='audio'&&<audio className="mediaPlayer audioPlayer" src={message.url} controls autoPlay/>}
+        {message.type==='video'&&<video className="mediaPlayer" src={message.url} controls autoPlay playsInline/>}
+        {message.type==='photo'&&<img className="photoViewer" src={message.photoUrl||message.url} alt="Guest memory"/>}
+        {message.type==='note'&&<div className="noteViewer">“{message.note}”</div>}
+        {message.photoUrl&&message.type!=='photo'&&<div className="linkedPhoto"><p>Photo attached to this message</p><img src={message.photoUrl} alt="Attached guest"/></div>}
+        {message.url&&message.type!=='note'&&<a className="downloadMedia" href={message.url} download={'VoiceMento-'+message.id}><Download size={17}/> Save media</a>}
+      </div>
+    </div>
+  )
+}
+
+function Stat({icon,label,value}) {
+  return <div className="stat"><div className="statIcon">{icon}</div><div><span>{label}</span><strong>{value}</strong></div></div>
+}
