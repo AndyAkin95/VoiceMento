@@ -5,7 +5,8 @@ import {
   Phone, Mic, Video, Heart, Settings, Play, Square, RotateCcw,
   QrCode, Images, CalendarDays, Users, Download, ChevronLeft,
   Camera, CheckCircle2, LockKeyhole, X, Sparkles, LogOut,
-  FileText, Image as ImageIcon, SwitchCamera, Eye, Save, SkipForward
+  FileText, Image as ImageIcon, SwitchCamera, Eye, Save, SkipForward,
+  Star, Upload, Volume2
 } from 'lucide-react'
 
 const DEFAULT_EVENT = {
@@ -14,11 +15,44 @@ const DEFAULT_EVENT = {
   prompt: "Leave us a message we'll keep forever",
   accent: '#B58B6A',
   ambience: 'rose',
-  ambienceIntensity: 'normal'
+  ambienceIntensity: 'normal',
+  theme: 'romantic',
+  frame: 'floral',
+  welcomeText: 'A little piece of tonight, forever.',
+  thankYouText: 'Thank you for adding your memory to our story.',
+  hashtag: '#OliviaAndJames',
+  monogram: 'O ♥ J',
+  privacy: 'private',
+  package: 'full',
+  features: { audio:true, video:true, photo:true, note:true },
+  logoData: '',
+  backgroundData: '',
+  greetingData: ''
 }
 
 const DEFAULT_ADMIN_PIN = '8886'
 const RESET_SECONDS = 8
+
+const THEME_PRESETS = {
+  romantic:{label:'Romantic Floral',accent:'#B58B6A',ambience:'rose',frame:'floral'},
+  blackTie:{label:'Black Tie',accent:'#B9975B',ambience:'sparkles',frame:'blacktie'},
+  rustic:{label:'Rustic Autumn',accent:'#9B6A3E',ambience:'leaves',frame:'vintage'},
+  winter:{label:'Winter Wedding',accent:'#9AAEB8',ambience:'snow',frame:'gold'},
+  garden:{label:'Garden Party',accent:'#7E9B79',ambience:'blossoms',frame:'floral'},
+  minimal:{label:'Modern Minimal',accent:'#8A817B',ambience:'none',frame:'none'},
+  vintage:{label:'Vintage',accent:'#A17855',ambience:'sparkles',frame:'vintage'},
+  birthday:{label:'Birthday',accent:'#B8789D',ambience:'confetti',frame:'polaroid'},
+  graduation:{label:'Graduation',accent:'#806B48',ambience:'confetti',frame:'gold'},
+  baby:{label:'Baby Shower',accent:'#9AAFC1',ambience:'blossoms',frame:'polaroid'},
+  corporate:{label:'Corporate',accent:'#66727C',ambience:'none',frame:'none'}
+}
+
+const PACKAGE_FEATURES = {
+  voice:{label:'Voice Only',features:{audio:true,video:false,photo:false,note:false}},
+  voicePhoto:{label:'Voice + Photo',features:{audio:true,video:false,photo:true,note:false}},
+  premium:{label:'Premium Video',features:{audio:true,video:true,photo:true,note:false}},
+  full:{label:'Full Experience',features:{audio:true,video:true,photo:true,note:true}}
+}
 
 function openDb() {
   return new Promise((resolve, reject) => {
@@ -81,6 +115,28 @@ function bestMime(type) {
   return candidates.find(x => MediaRecorder.isTypeSupported(x)) || ''
 }
 
+function storedItem(item) {
+  const {url,photoUrl,playable,...clean}=item
+  return clean
+}
+
+function fileToDataUrl(file,maxBytes) {
+  return new Promise((resolve,reject)=>{
+    if (!file) return resolve('')
+    if (file.size > maxBytes) return reject(new Error('That file is too large for local event storage.'))
+    const reader=new FileReader()
+    reader.onload=()=>resolve(reader.result)
+    reader.onerror=()=>reject(new Error('Could not read that file.'))
+    reader.readAsDataURL(file)
+  })
+}
+
+function formatBytes(bytes) {
+  if (!bytes) return '0 MB'
+  if (bytes < 1024*1024) return (bytes/1024).toFixed(1)+' KB'
+  return (bytes/1024/1024).toFixed(1)+' MB'
+}
+
 export default function VoiceMentoPhase1() {
   const [view, setView] = useState('entrance')
   const [entering, setEntering] = useState(false)
@@ -102,6 +158,8 @@ export default function VoiceMentoPhase1() {
   const [noteText, setNoteText] = useState('')
   const [resetCountdown, setResetCountdown] = useState(RESET_SECONDS)
   const [selectedMessage, setSelectedMessage] = useState(null)
+  const [storageInfo, setStorageInfo] = useState({usage:0,quota:0})
+  const [assetError, setAssetError] = useState('')
 
   const [showAdminGate, setShowAdminGate] = useState(false)
   const [pin, setPin] = useState('')
@@ -130,6 +188,12 @@ export default function VoiceMentoPhase1() {
     } catch {}
     dbGetAll().then(setMessages).catch(() => {})
   }, [])
+
+  useEffect(() => {
+    if (navigator.storage?.estimate) {
+      navigator.storage.estimate().then(({usage=0,quota=0})=>setStorageInfo({usage,quota})).catch(()=>{})
+    }
+  }, [messages])
 
   useEffect(() => {
     if (recording) timerRef.current = setInterval(() => setSeconds(s => s + 1), 1000)
@@ -181,6 +245,45 @@ export default function VoiceMentoPhase1() {
   function saveEvent(next) {
     setEvent(next)
     try { localStorage.setItem('voicemento_event', JSON.stringify(next)) } catch {}
+  }
+
+  function applyTheme(key) {
+    const preset=THEME_PRESETS[key]
+    if (!preset) return
+    saveEvent({...event,theme:key,accent:preset.accent,ambience:preset.ambience,frame:preset.frame})
+  }
+
+  function applyPackage(key) {
+    const preset=PACKAGE_FEATURES[key]
+    if (!preset) return
+    saveEvent({...event,package:key,features:{...preset.features}})
+  }
+
+  function toggleFeature(key) {
+    saveEvent({...event,package:'custom',features:{...event.features,[key]:!event.features[key]}})
+  }
+
+  async function handleAssetUpload(e,field,maxBytes) {
+    setAssetError('')
+    const file=e.target.files?.[0]
+    if (!file) return
+    try {
+      const data=await fileToDataUrl(file,maxBytes)
+      saveEvent({...event,[field]:data})
+    } catch(err) {
+      setAssetError(err.message || 'Could not save that file.')
+    } finally {
+      e.target.value=''
+    }
+  }
+
+  async function toggleFavorite(item) {
+    const updated={...item,favorite:!item.favorite}
+    try {
+      await dbPut(storedItem(updated))
+      setMessages(prev=>prev.map(x=>x.id===updated.id?updated:x))
+      if (selectedMessage?.id===updated.id) setSelectedMessage(updated)
+    } catch {}
   }
 
   function openAdmin() {
@@ -394,7 +497,8 @@ export default function VoiceMentoPhase1() {
     setPhotoShots(next)
     if (next.length >= photoCount) {
       stopStream(streamRef, videoPreviewRef)
-      const finalBlob = photoCount === 1 ? next[0] : await buildStrip(next)
+      const rawBlob = photoCount === 1 ? next[0] : await buildStrip(next)
+      const finalBlob = await applyPhotoFrame(rawBlob)
       const url = URL.createObjectURL(finalBlob)
       if (mode === 'attachment') {
         setAttachedPhoto({blob:finalBlob,url})
@@ -411,6 +515,43 @@ export default function VoiceMentoPhase1() {
         setBoothStep('review')
       }
     }
+  }
+
+  async function applyPhotoFrame(blob) {
+    if (!blob || event.frame==='none') return blob
+    const img=await new Promise(resolve=>{
+      const x=new Image()
+      x.onload=()=>resolve(x)
+      x.src=URL.createObjectURL(blob)
+    })
+    const canvas=document.createElement('canvas')
+    canvas.width=img.width
+    canvas.height=img.height
+    const ctx=canvas.getContext('2d')
+    ctx.drawImage(img,0,0)
+    const w=canvas.width,h=canvas.height
+    if (event.frame==='vintage') {
+      ctx.fillStyle='rgba(116,82,48,.12)'
+      ctx.fillRect(0,0,w,h)
+      ctx.strokeStyle='#8f6849';ctx.lineWidth=Math.max(12,w*.018);ctx.strokeRect(10,10,w-20,h-20)
+    } else if (event.frame==='blacktie') {
+      ctx.strokeStyle='#161414';ctx.lineWidth=Math.max(28,w*.035);ctx.strokeRect(0,0,w,h)
+      ctx.strokeStyle='#c6a15d';ctx.lineWidth=Math.max(5,w*.007);ctx.strokeRect(22,22,w-44,h-44)
+    } else if (event.frame==='gold') {
+      ctx.strokeStyle='#c6a15d';ctx.lineWidth=Math.max(18,w*.024);ctx.strokeRect(10,10,w-20,h-20)
+      ctx.strokeStyle='rgba(255,255,255,.8)';ctx.lineWidth=3;ctx.strokeRect(28,28,w-56,h-56)
+    } else if (event.frame==='floral') {
+      ctx.strokeStyle=event.accent;ctx.lineWidth=Math.max(12,w*.018);ctx.strokeRect(10,10,w-20,h-20)
+      ctx.fillStyle=event.accent
+      ;[[34,34],[w-34,34],[34,h-34],[w-34,h-34]].forEach(([x,y])=>{
+        for(let i=0;i<5;i++){ctx.beginPath();ctx.arc(x+Math.cos(i*1.256)*12,y+Math.sin(i*1.256)*12,7,0,Math.PI*2);ctx.fill()}
+      })
+    } else if (event.frame==='polaroid') {
+      ctx.fillStyle='rgba(255,255,255,.94)'
+      ctx.fillRect(0,0,w,Math.max(18,h*.035));ctx.fillRect(0,0,Math.max(18,w*.035),h);ctx.fillRect(w-Math.max(18,w*.035),0,Math.max(18,w*.035),h);ctx.fillRect(0,h-Math.max(56,h*.09),w,Math.max(56,h*.09))
+      ctx.fillStyle='#574b43';ctx.textAlign='center';ctx.font=Math.max(18,w*.03)+'px Georgia';ctx.fillText(event.title,w/2,h-Math.max(20,h*.035))
+    }
+    return await canvasBlob(canvas,.9)
   }
 
   async function buildStrip(blobs) {
@@ -509,17 +650,18 @@ export default function VoiceMentoPhase1() {
 
   if (view === 'entrance') {
     return (
-      <main className={'weddingEntrance ambience-' + event.ambience + ' intensity-' + event.ambienceIntensity + (entering?' entering':'')} style={{'--accent':event.accent}}>
+      <main className={'weddingEntrance theme-' + event.theme + ' ambience-' + event.ambience + ' intensity-' + event.ambienceIntensity + (entering?' entering':'')} style={{'--accent':event.accent,...(event.backgroundData?{backgroundImage:'linear-gradient(rgba(250,246,241,.72),rgba(240,230,221,.82)),url("'+event.backgroundData+'")',backgroundSize:'cover',backgroundPosition:'center'}:{})}}>
         <div className="paperTexture"/>
         <Atmosphere type={event.ambience} intensity={event.ambienceIntensity}/>
         <button className="adminLock" onClick={openAdmin}><LockKeyhole size={16}/> Admin</button>
         <section className="entranceCopy">
-          <div className="monogram"><span>V</span><Heart size={14} fill="currentColor"/><span>M</span></div>
-          <p className="scriptLine">A little piece of tonight, forever.</p>
+          <div className="monogram customMonogram">{event.logoData?<img src={event.logoData} alt="Event logo"/>:<span>{event.monogram}</span>}</div>
+          <p className="scriptLine">{event.welcomeText}</p>
           <h1>{event.title}</h1>
           <div className="ornament"><span/><Sparkles size={16}/><span/></div>
           <p className="eventDate">{event.subtitle}</p>
           <p className="entranceHint">Tap the booth and leave a memory for the happy couple.</p>
+          {event.hashtag&&<p className="eventHashtag">{event.hashtag}</p>}
         </section>
         <button className="boothStage" onClick={enterBooth} aria-label="Enter VoiceMento">
           <span className="floorShadow"/><span className="boothGlow"/>
@@ -542,26 +684,27 @@ export default function VoiceMentoPhase1() {
 
   if (view === 'booth') {
     return (
-      <main className={'boothExperience ambience-' + event.ambience + ' intensity-' + event.ambienceIntensity} style={{'--accent':event.accent}}>
+      <main className={'boothExperience theme-' + event.theme + ' ambience-' + event.ambience + ' intensity-' + event.ambienceIntensity} style={{'--accent':event.accent,...(event.backgroundData?{backgroundImage:'linear-gradient(rgba(250,246,241,.82),rgba(240,230,221,.9)),url("'+event.backgroundData+'")',backgroundSize:'cover',backgroundPosition:'center'}:{})}}>
         <Atmosphere type={event.ambience} intensity={event.ambienceIntensity} subtle/>
         <div className="floralCorner floralTop"/><div className="floralCorner floralBottom"/>
         <button className="guestExit" onClick={exitToEntrance}><ChevronLeft size={19}/> Exit booth</button>
         <button className="adminLock boothAdmin" onClick={openAdmin}><LockKeyhole size={16}/> Admin</button>
 
         <section className="phaseCard">
-          <div className="cardMonogram">V<span>♥</span>M</div>
+          <div className="cardMonogram customCardMonogram">{event.logoData?<img src={event.logoData} alt="Event logo"/>:event.monogram}</div>
           <p className="tinyLabel">A MEMORY FOR</p>
           <h1>{event.title}</h1>
 
           {boothStep === 'choose' && (
             <>
               <p className="phasePrompt">How would you like to leave your memory?</p>
+              {event.greetingData&&<button className="greetingButton" onClick={()=>new Audio(event.greetingData).play().catch(()=>{})}><Volume2 size={17}/> Hear a welcome from the hosts</button>}
               <input className="guestNameInput" value={guestName} onChange={e=>setGuestName(e.target.value)} placeholder="Your name(s) — optional"/>
               <div className="memoryChoices">
-                <button onClick={()=>beginMedia('audio')}><Mic/><strong>Voice</strong><span>Leave a heartfelt message</span></button>
-                <button onClick={()=>beginMedia('video')}><Video/><strong>Video</strong><span>Record a video message</span></button>
-                <button onClick={()=>openPhotoCapture(1,false)}><Camera/><strong>Photo Booth</strong><span>Single photo or photo strip</span></button>
-                <button onClick={startNote}><FileText/><strong>Written Note</strong><span>Write something they can keep</span></button>
+                {event.features.audio&&<button onClick={()=>beginMedia('audio')}><Mic/><strong>Voice</strong><span>Leave a heartfelt message</span></button>}
+                {event.features.video&&<button onClick={()=>beginMedia('video')}><Video/><strong>Video</strong><span>Record a video message</span></button>}
+                {event.features.photo&&<button onClick={()=>openPhotoCapture(1,false)}><Camera/><strong>Photo Booth</strong><span>Single photo or photo strip</span></button>}
+                {event.features.note&&<button onClick={startNote}><FileText/><strong>Written Note</strong><span>Write something they can keep</span></button>}
               </div>
               {recordError && <p className="recordError">{recordError}</p>}
             </>
@@ -613,7 +756,7 @@ export default function VoiceMentoPhase1() {
                 {pending.type==='note' && <div className="noteReview">“{pending.note}”</div>}
               </div>
 
-              {(pending.type==='audio' || pending.type==='video') && (
+              {event.features.photo && (pending.type==='audio' || pending.type==='video') && (
                 <div className="photoAttachment">
                   {attachedPhoto ? (
                     <div className="attachedPreview">
@@ -637,12 +780,12 @@ export default function VoiceMentoPhase1() {
             <div className="savedMoment">
               <CheckCircle2 size={48}/>
               <h2>Added to their story.</h2>
-              <p>Thank you{guestName.trim()?' '+guestName.trim():''}. Returning to the booth in {resetCountdown}s.</p>
+              <p>{event.thankYouText}{guestName.trim()?' — '+guestName.trim():''} Returning to the booth in {resetCountdown}s.</p>
               <button className="secondary" onClick={exitToEntrance}><SkipForward size={18}/> Done</button>
             </div>
           )}
 
-          {boothStep==='choose' && (
+          {boothStep==='choose' && event.features.photo && (
             <div className="photoStripPicker">
               <span>Photo Booth style:</span>
               {[1,3,4].map(n=><button key={n} className={photoCount===n?'active':''} onClick={()=>setPhotoCount(n)}>{n===1?'Single':n+'-Photo Strip'}</button>)}
@@ -713,6 +856,82 @@ export default function VoiceMentoPhase1() {
           </section>
         </div>
 
+        <div className="grid2 phase2Grid">
+          <section className="panel">
+            <div className="panelHead"><div><span>Theme preset</span><small>Change the entire event mood at once</small></div><Sparkles size={20}/></div>
+            <div className="themePresetGrid">
+              {Object.entries(THEME_PRESETS).map(([key,t])=><button key={key} className={event.theme===key?'themePreset active':'themePreset'} onClick={()=>applyTheme(key)}><i style={{background:t.accent}}/><span>{t.label}</span></button>)}
+            </div>
+            <label>Photo frame
+              <select value={event.frame} onChange={e=>saveEvent({...event,frame:e.target.value})}>
+                <option value="none">None</option><option value="floral">Floral</option><option value="gold">Gold</option><option value="polaroid">Polaroid</option><option value="vintage">Vintage Film</option><option value="blacktie">Black-Tie Gold</option>
+              </select>
+            </label>
+          </section>
+
+          <section className="panel">
+            <div className="panelHead"><div><span>Guest experience copy</span><small>Personalize the words guests see</small></div><FileText size={20}/></div>
+            <label>Welcome line<input value={event.welcomeText} onChange={e=>saveEvent({...event,welcomeText:e.target.value})}/></label>
+            <label>Thank-you message<textarea value={event.thankYouText} onChange={e=>saveEvent({...event,thankYouText:e.target.value})}/></label>
+            <label>Event hashtag<input value={event.hashtag} onChange={e=>saveEvent({...event,hashtag:e.target.value})}/></label>
+            <label>Monogram<input maxLength={16} value={event.monogram} onChange={e=>saveEvent({...event,monogram:e.target.value})}/></label>
+          </section>
+        </div>
+
+        <div className="grid2 phase2Grid">
+          <section className="panel">
+            <div className="panelHead"><div><span>Branding & media</span><small>Stored locally on this booth device</small></div><Upload size={20}/></div>
+            <div className="assetButtons">
+              <label className="uploadTile"><Upload size={18}/><span>{event.logoData?'Replace logo':'Upload logo'}</span><input type="file" accept="image/*" onChange={e=>handleAssetUpload(e,'logoData',750000)}/></label>
+              <label className="uploadTile"><ImageIcon size={18}/><span>{event.backgroundData?'Replace background':'Upload background'}</span><input type="file" accept="image/*" onChange={e=>handleAssetUpload(e,'backgroundData',1500000)}/></label>
+              <label className="uploadTile"><Volume2 size={18}/><span>{event.greetingData?'Replace greeting':'Upload greeting'}</span><input type="file" accept="audio/*" onChange={e=>handleAssetUpload(e,'greetingData',1500000)}/></label>
+            </div>
+            <div className="assetClearRow">
+              {event.logoData&&<button className="secondary compact" onClick={()=>saveEvent({...event,logoData:''})}>Clear logo</button>}
+              {event.backgroundData&&<button className="secondary compact" onClick={()=>saveEvent({...event,backgroundData:''})}>Clear background</button>}
+              {event.greetingData&&<button className="secondary compact" onClick={()=>saveEvent({...event,greetingData:''})}>Clear greeting</button>}
+            </div>
+            {assetError&&<p className="recordError">{assetError}</p>}
+          </section>
+
+          <section className="panel">
+            <div className="panelHead"><div><span>Privacy & package</span><small>Control what the event includes</small></div><LockKeyhole size={20}/></div>
+            <label>Gallery privacy
+              <select value={event.privacy} onChange={e=>saveEvent({...event,privacy:e.target.value})}>
+                <option value="private">Private — admin only</option>
+                <option value="after">Guest access after event</option>
+                <option value="guests">Guest-viewable gallery</option>
+              </select>
+            </label>
+            <label>Package
+              <select value={event.package} onChange={e=>applyPackage(e.target.value)}>
+                {Object.entries(PACKAGE_FEATURES).map(([key,v])=><option key={key} value={key}>{v.label}</option>)}
+                <option value="custom">Custom</option>
+              </select>
+            </label>
+            <div className="featureToggles">
+              {['audio','video','photo','note'].map(key=><button key={key} className={event.features[key]?'featureToggle on':'featureToggle'} onClick={()=>toggleFeature(key)}><span>{key==='audio'?'Voice':key[0].toUpperCase()+key.slice(1)}</span><i/></button>)}
+            </div>
+          </section>
+        </div>
+
+        <div className="grid2 phase2Grid">
+          <section className="panel storagePanel">
+            <div className="panelHead"><div><span>Booth storage</span><small>Browser storage used by this event device</small></div><Save size={20}/></div>
+            <div className="storageNumbers"><strong>{formatBytes(storageInfo.usage)}</strong><span>of {storageInfo.quota?formatBytes(storageInfo.quota):'available device quota'}</span></div>
+            <div className="storageBar"><i style={{width:(storageInfo.quota?Math.min(100,(storageInfo.usage/storageInfo.quota)*100):0)+'%'}}/></div>
+            <p className="securityNote">{messages.length} saved memories on this device.</p>
+          </section>
+          <section className="panel miniPreview">
+            <p className="tinyLabel">CURRENT EXPERIENCE</p>
+            <h3>{THEME_PRESETS[event.theme]?.label || 'Custom Theme'}</h3>
+            <p>{PACKAGE_FEATURES[event.package]?.label || 'Custom Package'} · {event.privacy==='private'?'Private gallery':event.privacy==='after'?'Gallery after event':'Guest-viewable gallery'}</p>
+            <div className="phaseFeatureIcons">
+              {event.features.audio&&<Mic/>}{event.features.video&&<Video/>}{event.features.photo&&<Camera/>}{event.features.note&&<FileText/>}
+            </div>
+          </section>
+        </div>
+
         <div className="grid2 adminSecondRow">
           <section className="panel">
             <div className="panelHead"><div><span>Admin security</span><small>Change the dashboard PIN</small></div><LockKeyhole size={20}/></div>
@@ -739,7 +958,10 @@ export default function VoiceMentoPhase1() {
                   <div className="msgIcon">{m.type==='audio'?<Mic size={19}/>:m.type==='video'?<Video size={19}/>:m.type==='photo'?<Camera size={19}/>:<FileText size={19}/>}</div>
                   <div><strong>{m.guest}</strong><span>{labelFor(m)}{m.photoBlob && m.type!=='photo'?' · photo attached':''}</span></div>
                   <time>{m.time}</time>
-                  <button disabled={!m.playable} onClick={()=>m.playable&&setSelectedMessage(m)}>{m.type==='photo'||m.type==='note'?<Eye size={17}/>:<Play size={17}/>}</button>
+                  <div className="messageActions">
+                    <button className={m.favorite?'favorite active':'favorite'} onClick={()=>toggleFavorite(m)} title="Favorite"><Star size={16} fill={m.favorite?'currentColor':'none'}/></button>
+                    <button disabled={!m.playable} onClick={()=>m.playable&&setSelectedMessage(m)}>{m.type==='photo'||m.type==='note'?<Eye size={17}/>:<Play size={17}/>}</button>
+                  </div>
                 </div>
               ))}
             </div>
