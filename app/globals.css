@@ -23,3 +23,67 @@
 @media(max-width:900px){.weddingEntrance{grid-template-columns:1fr;align-content:center;text-align:center;padding:70px 20px 28px}.entranceCopy{justify-self:center;padding:0}.monogram,.ornament{margin-left:auto;margin-right:auto;justify-content:center}.entranceHint{margin-left:auto;margin-right:auto}.boothStage{width:min(430px,82vw);height:min(560px,58svh);margin-top:6px}.phoneBooth{height:92%;width:66%;min-height:350px}.poweredBy{display:none}.adminSecondRow{grid-template-columns:1fr}.recordingCard{padding:42px 24px}}
 @media(max-width:560px){.weddingEntrance{min-height:100svh;padding-top:64px}.scriptLine{font-size:24px}.entranceCopy h1{font-size:52px}.eventDate{font-size:12px}.entranceHint{font-size:13px;margin-top:16px}.boothStage{height:50svh;width:90vw;margin-top:4px}.phoneBooth{height:96%;width:58%;min-width:200px;min-height:310px}.boothCrown{font-size:10px}.tapLabel{bottom:-4px}.adminLock{right:12px;top:12px;padding:9px 12px}.recordingCard{border-radius:26px;padding:38px 20px 30px}.recordingCard h1{font-size:37px}.modeRow{grid-template-columns:1fr}.guestExit{left:12px;top:12px;padding:9px 12px}.boothAdmin{right:12px;top:12px}}
 @media(prefers-reduced-motion:reduce){.rosePetals i{animation:none}.entering .phoneBooth{transition-duration:.35s}.entering:after{animation-duration:.45s}}
+
+
+/* Luxury ornate pass */
+.weddingEntrance,.boothExperience{height:100svh;min-height:100svh;max-height:100svh;overflow:hidden}
+.weddingEntrance{isolation:isolate}
+.paperTexture:before,.paperTexture:after{content:"";position:absolute;width:170px;height:170px;z-index:1;opacity:.52;pointer-events:none;background:
+radial-gradient(circle at 18% 18%,transparent 0 45%,rgba(165,128,96,.35) 46% 47%,transparent 48%),
+radial-gradient(circle at 34% 34%,transparent 0 52%,rgba(165,128,96,.24) 53% 54%,transparent 55%),
+conic-gradient(from 45deg at 0 0,transparent 0 82deg,rgba(169,128,96,.32) 83deg 86deg,transparent 87deg);
+border-top:1px solid rgba(171,132,99,.35);border-left:1px solid rgba(171,132,99,.35);border-radius:28px 0 0 0}
+.paperTexture:before{top:24px;left:24px}
+.paperTexture:after{right:24px;bottom:24px;transform:rotate(180deg)}
+.entranceCopy:before,.entranceCopy:after{content:"✦";position:absolute;color:rgba(174,134,100,.45);font-size:18px}
+.entranceCopy:before{left:-28px;top:10%}.entranceCopy:after{right:-20px;bottom:18%}
+.ornament{position:relative}.ornament:before,.ornament:after{content:"❧";font-family:Georgia,serif;font-size:18px;color:var(--accent)}.ornament:after{transform:scaleX(-1)}
+
+.phoneBooth{filter:drop-shadow(0 30px 35px rgba(74,51,35,.22))}
+.boothTopCap{height:9%;border:1px solid #b99c7c;background:linear-gradient(180deg,#fffdf8 0%,#f5eadf 42%,#dec9b5 100%);box-shadow:inset 0 3px 0 #fff,0 -4px 0 rgba(160,119,80,.22)}
+.boothTopCap:before{content:"";position:absolute;left:15%;right:15%;top:-10px;height:18px;border:2px solid #b68c5f;border-bottom:0;border-radius:50% 50% 0 0;box-shadow:0 0 0 4px rgba(255,253,248,.55) inset}
+.boothTopCap:after{content:"◆";position:absolute;left:50%;top:-18px;transform:translateX(-50%);color:#b1875b;font-size:18px;text-shadow:0 1px 0 #fff}
+.boothCrown{top:7%;height:13%;border-color:#b69574;box-shadow:inset 0 0 0 4px rgba(255,255,255,.5),inset 0 -6px 12px rgba(147,102,64,.08)}
+.boothCrown:before,.boothCrown:after{content:"✦";position:absolute;color:#b18a64;font-size:12px}.boothCrown:before{left:16px}.boothCrown:after{right:16px}
+.boothBody{border:3px double #b99472;box-shadow:inset 7px 0 10px rgba(111,78,51,.06),inset -7px 0 10px rgba(111,78,51,.06)}
+.boothBody:before,.boothBody:after{content:"";position:absolute;z-index:12;top:-1%;bottom:-1%;width:8%;background:linear-gradient(90deg,#b58a60,#ecd8c0 30%,#fff7ec 52%,#c99e72 100%);border:1px solid #ac845f;box-shadow:inset 0 0 0 3px rgba(255,255,255,.35)}
+.boothBody:before{left:-6%}.boothBody:after{right:-6%;transform:scaleX(-1)}
+.boothDoor{border:2px solid #b99370}.doorGlass{border:2px double #ae8864;box-shadow:inset 0 0 0 3px rgba(255,255,255,.5),inset 0 0 30px rgba(255,255,255,.72)}
+.doorGlass span{position:relative}.doorGlass span:after{content:"";position:absolute;inset:22%;border:1px solid rgba(181,143,107,.2);border-radius:50%}
+.doorPanelDetail{border:3px double #b89573;border-radius:42% 42% 12px 12px}
+.doorPanelDetail:after{content:"♥";position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);font-family:Georgia,serif;color:#b28a65;font-size:18px;opacity:.75}
+.boothBase{height:8%;border:2px solid #ad8764;box-shadow:inset 0 3px 0 rgba(255,255,255,.5)}
+.boothBase:after{content:"";position:absolute;left:12%;right:12%;bottom:-8px;height:8px;border-radius:50%;background:rgba(96,65,43,.16);filter:blur(5px)}
+
+.boothExperience{display:flex;align-items:center;justify-content:center;padding:max(16px,env(safe-area-inset-top)) max(16px,env(safe-area-inset-right)) max(16px,env(safe-area-inset-bottom)) max(16px,env(safe-area-inset-left))}
+.recordingCard{margin:auto;display:flex;flex-direction:column;align-items:center;justify-content:center;width:min(680px,92vw);height:min(760px,calc(100svh - 48px));max-height:calc(100svh - 48px);overflow:hidden;padding:clamp(24px,4.2vh,48px) clamp(22px,5vw,60px)}
+.recordingCard:after{content:"";position:absolute;inset:22px;border-radius:20px;pointer-events:none;background:
+radial-gradient(circle at 0 0,transparent 0 22px,rgba(179,139,104,.28) 23px 24px,transparent 25px),
+radial-gradient(circle at 100% 0,transparent 0 22px,rgba(179,139,104,.28) 23px 24px,transparent 25px),
+radial-gradient(circle at 0 100%,transparent 0 22px,rgba(179,139,104,.28) 23px 24px,transparent 25px),
+radial-gradient(circle at 100% 100%,transparent 0 22px,rgba(179,139,104,.28) 23px 24px,transparent 25px)}
+.recordingCard h1,.recordingCard h2,.recordingCard p,.recordingCard .modeRow,.recordingCard .recordArea,.recordingCard .successBox{position:relative;z-index:2}
+.cardMonogram,.fineRule,.receiverMedallion{position:relative;z-index:2}
+.receiverMedallion{flex:0 0 auto}
+.modeRow{width:100%;max-width:520px}
+.recordArea{width:100%}
+
+@media(max-width:900px){
+  .weddingEntrance{grid-template-columns:1fr;grid-template-rows:auto minmax(0,1fr);align-content:stretch;padding:58px 18px 14px}
+  .entranceCopy{padding:0;align-self:center}
+  .boothStage{align-self:stretch;height:auto;min-height:0;max-height:none;width:min(390px,82vw);margin:0 auto}
+  .phoneBooth{height:92%;min-height:0;max-height:470px}
+  .paperTexture:before,.paperTexture:after{width:120px;height:120px}
+}
+@media(max-width:560px){
+  .weddingEntrance{padding:54px 12px 10px}
+  .entranceCopy h1{font-size:clamp(40px,13vw,54px)}
+  .scriptLine{font-size:21px;margin-bottom:2px}.entranceHint{margin-top:10px;line-height:1.4}
+  .ornament{margin-top:14px;margin-bottom:8px}.monogram{margin-bottom:10px}
+  .boothStage{width:min(315px,78vw);height:auto;min-height:0}.phoneBooth{width:63%;height:96%;max-height:390px;min-height:270px}
+  .recordingCard{width:94vw;height:calc(100svh - 72px);max-height:calc(100svh - 72px);padding:24px 18px;border-radius:24px}
+  .recordingCard>.tinyLabel{margin:10px 0 4px}.recordingCard h1{font-size:34px}.dateLine{margin:4px 0 10px}.fineRule{margin-bottom:10px}
+  .receiverMedallion{width:62px;height:62px;margin-bottom:10px}.recordingCard h2{font-size:22px}.helper{font-size:12px}
+  .modeRow{gap:8px;margin:12px 0}.mode{padding:11px}.timer{font-size:31px;margin:6px}.privacy{margin-top:8px}
+  .paperTexture:before{top:10px;left:10px}.paperTexture:after{right:10px;bottom:10px}
+}
