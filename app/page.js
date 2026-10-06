@@ -41,7 +41,13 @@ export default function Home() {
       if (savedMessages) setMessages(JSON.parse(savedMessages))
       const savedEvent = localStorage.getItem('voicemento_event')
       if (savedEvent) setEvent({ ...DEFAULT_EVENT, ...JSON.parse(savedEvent) })
-      setAdminPinDraft(localStorage.getItem('voicemento_admin_pin') || DEFAULT_ADMIN_PIN)
+      const savedPin = localStorage.getItem('voicemento_admin_pin')
+      if (!savedPin || savedPin === '2468') {
+        localStorage.setItem('voicemento_admin_pin', DEFAULT_ADMIN_PIN)
+        setAdminPinDraft(DEFAULT_ADMIN_PIN)
+      } else {
+        setAdminPinDraft(savedPin)
+      }
     } catch {}
   }, [])
 

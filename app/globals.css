@@ -87,3 +87,14 @@ radial-gradient(circle at 100% 100%,transparent 0 22px,rgba(179,139,104,.28) 23p
   .modeRow{gap:8px;margin:12px 0}.mode{padding:11px}.timer{font-size:31px;margin:6px}.privacy{margin-top:8px}
   .paperTexture:before{top:10px;left:10px}.paperTexture:after{right:10px;bottom:10px}
 }
+
+
+/* Final viewport lock */
+html,body{width:100%;height:100%;overflow:hidden;overscroll-behavior:none}
+body{min-height:100%;background:#f5f0ea}
+.appShell{height:100svh;min-height:100svh;overflow:hidden}
+.sidebar{height:100svh;overflow:hidden}
+.content{height:100svh;overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch}
+.weddingEntrance,.boothExperience{width:100vw;height:100svh;min-height:100svh;max-height:100svh;overflow:hidden}
+.boothExperience{align-items:center;justify-content:center}
+.recordingCard{margin:auto}
