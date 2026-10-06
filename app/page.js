@@ -14,7 +14,7 @@ const DEFAULT_EVENT = {
   accent: '#B58B6A'
 }
 
-const DEFAULT_ADMIN_PIN = '2468'
+const DEFAULT_ADMIN_PIN = '8886'
 
 export default function Home() {
   const [view, setView] = useState('entrance')
@@ -281,7 +281,7 @@ export default function Home() {
               <input inputMode="numeric" pattern="[0-9]*" maxLength={8} value={adminPinDraft} onChange={e=>setAdminPinDraft(e.target.value.replace(/\D/g,''))} placeholder="4–8 digits"/>
             </label>
             <button className="secondary" onClick={saveAdminPin}>{pinSaved ? 'Saved ✓' : 'Save admin PIN'}</button>
-            <p className="securityNote">Default PIN is 2468. This demo stores the PIN on this device; a production version should use secure server-side authentication.</p>
+            <p className="securityNote">Default PIN is 8886. This demo stores the PIN on this device; a production version should use secure server-side authentication.</p>
           </section>
 
           <section className="panel miniPreview">
