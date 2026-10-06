@@ -27,7 +27,17 @@ const DEFAULT_EVENT = {
   features: { audio:true, video:true, photo:true, note:true },
   logoData: '',
   backgroundData: '',
-  greetingData: ''
+  greetingData: '',
+  autoMatchTheme: true,
+  boothStyle: 'ivory',
+  phone: {
+    body: '#D7B58C',
+    handset: '#2A211D',
+    trim: '#B58B6A',
+    cord: '#2F2925',
+    finish: 'glossy',
+    plaque: 'VOICEMENTO'
+  }
 }
 
 const DEFAULT_ADMIN_PIN = '8886'
@@ -45,6 +55,30 @@ const THEME_PRESETS = {
   graduation:{label:'Graduation',accent:'#806B48',ambience:'confetti',frame:'gold'},
   baby:{label:'Baby Shower',accent:'#9AAFC1',ambience:'blossoms',frame:'polaroid'},
   corporate:{label:'Corporate',accent:'#66727C',ambience:'none',frame:'none'}
+}
+
+const THEME_PHONE = {
+  romantic:{body:'#D9B88F',handset:'#2A211D',trim:'#B58B6A',cord:'#2F2925',finish:'glossy',booth:'ivory'},
+  blackTie:{body:'#1D1A18',handset:'#0E0D0C',trim:'#C5A45F',cord:'#171513',finish:'glossy',booth:'blackGold'},
+  rustic:{body:'#7B5134',handset:'#35241B',trim:'#B38654',cord:'#34251E',finish:'aged',booth:'walnut'},
+  winter:{body:'#EEECE6',handset:'#47535A',trim:'#A7B3B9',cord:'#4A5156',finish:'glossy',booth:'winter'},
+  garden:{body:'#AAB79A',handset:'#413C32',trim:'#B89C70',cord:'#39342D',finish:'matte',booth:'garden'},
+  minimal:{body:'#E8E5DF',handset:'#292929',trim:'#8F8A86',cord:'#292929',finish:'matte',booth:'modern'},
+  vintage:{body:'#7F3136',handset:'#2B1D1A',trim:'#B9915F',cord:'#2B211E',finish:'aged',booth:'walnut'},
+  birthday:{body:'#D99CB9',handset:'#6B4256',trim:'#C49A63',cord:'#6B4256',finish:'glossy',booth:'ivory'},
+  graduation:{body:'#253956',handset:'#111A27',trim:'#C3A05A',cord:'#172233',finish:'glossy',booth:'blackGold'},
+  baby:{body:'#BFD4E0',handset:'#5B6870',trim:'#C5BBAE',cord:'#66737A',finish:'matte',booth:'winter'},
+  corporate:{body:'#5D6870',handset:'#20262A',trim:'#AAB0B4',cord:'#242A2E',finish:'matte',booth:'modern'}
+}
+
+const BOOTH_STYLES = {
+  ivory:'Ivory Wedding',
+  blackGold:'Black & Gold',
+  walnut:'Walnut & Brass',
+  classicRed:'Classic Red',
+  garden:'Garden White',
+  winter:'Winter Silver',
+  modern:'Modern Minimal'
 }
 
 const PACKAGE_FEATURES = {
@@ -137,6 +171,19 @@ function formatBytes(bytes) {
   return (bytes/1024/1024).toFixed(1)+' MB'
 }
 
+function getPhoneConfig(event) {
+  const manual={...DEFAULT_EVENT.phone,...(event.phone||{})}
+  if (event.autoMatchTheme !== false) {
+    return {...manual,...(THEME_PHONE[event.theme]||THEME_PHONE.romantic),plaque:manual.plaque}
+  }
+  return manual
+}
+
+function getBoothStyle(event) {
+  if (event.autoMatchTheme !== false) return (THEME_PHONE[event.theme]||THEME_PHONE.romantic).booth
+  return event.boothStyle || 'ivory'
+}
+
 export default function VoiceMentoPhase1() {
   const [view, setView] = useState('entrance')
   const [entering, setEntering] = useState(false)
@@ -183,7 +230,15 @@ export default function VoiceMentoPhase1() {
     if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js').catch(() => {})
     try {
       const savedEvent = localStorage.getItem('voicemento_event')
-      if (savedEvent) setEvent({ ...DEFAULT_EVENT, ...JSON.parse(savedEvent) })
+      if (savedEvent) {
+        const parsed=JSON.parse(savedEvent)
+        setEvent({
+          ...DEFAULT_EVENT,
+          ...parsed,
+          phone:{...DEFAULT_EVENT.phone,...(parsed.phone||{})},
+          features:{...DEFAULT_EVENT.features,...(parsed.features||{})}
+        })
+      }
       const savedPin = localStorage.getItem('voicemento_admin_pin')
       if (!savedPin || savedPin === '2468') {
         localStorage.setItem('voicemento_admin_pin', DEFAULT_ADMIN_PIN)
@@ -695,6 +750,9 @@ export default function VoiceMentoPhase1() {
     setAttachedPhoto(null)
   }
 
+  const activePhone=getPhoneConfig(event)
+  const activeBoothStyle=getBoothStyle(event)
+
   if (view === 'entrance') {
     return (
       <main className={'weddingEntrance theme-' + event.theme + ' ambience-' + event.ambience + ' intensity-' + event.ambienceIntensity + (entering?' entering':'')} style={{'--accent':event.accent,...(event.backgroundData?{backgroundImage:'linear-gradient(rgba(250,246,241,.72),rgba(240,230,221,.82)),url("'+event.backgroundData+'")',backgroundSize:'cover',backgroundPosition:'center'}:{})}}>
@@ -713,10 +771,10 @@ export default function VoiceMentoPhase1() {
         </section>
         <button className="boothStage" onClick={enterBooth} aria-label="Enter VoiceMento">
           <span className="floorShadow"/><span className="boothGlow"/>
-          <span className="phoneBooth">
+          <span className={'phoneBooth boothStyle-'+activeBoothStyle}>
             <span className="boothTopCap"/><span className="boothCrown">VOICEMENTO</span>
             <span className="boothBody">
-              <span className="boothInterior"><VintagePhone compact/><small>STEP INSIDE</small></span>
+              <span className="boothInterior"><VintagePhone compact config={activePhone}/><small>STEP INSIDE</small></span>
               <span className="boothDoor boothDoorLeft"><span className="doorGlass"><span/><span/><span/><span/><span/><span/></span><span className="doorPanelDetail"/><span className="doorHandle"/></span>
               <span className="boothDoor boothDoorRight"><span className="doorGlass"><span/><span/><span/><span/><span/><span/></span><span className="doorPanelDetail"/><span className="doorHandle"/></span>
             </span>
@@ -766,7 +824,7 @@ export default function VoiceMentoPhase1() {
 
           {boothStep === 'choose' && (
             <>
-              <div className="openedBoothPhone"><VintagePhone ringing/></div>
+              <div className="openedBoothPhone"><VintagePhone ringing config={activePhone}/></div>
               <p className="phasePrompt">Pick up a memory and leave something they’ll keep forever.</p>
               {event.greetingData&&<button className="greetingButton" onClick={()=>new Audio(event.greetingData).play().catch(()=>{})}><Volume2 size={17}/> Hear a welcome from the hosts</button>}
               <input className="guestNameInput" value={guestName} onChange={e=>setGuestName(e.target.value)} placeholder="Your name(s) — optional"/>
@@ -783,7 +841,7 @@ export default function VoiceMentoPhase1() {
           {boothStep === 'record' && (
             <>
               <p className="phasePrompt">{mode==='video'?'Look into the camera and speak from the heart.':'Speak into the receiver — we’re listening.'}</p>
-              {mode==='audio' && <div className="recordingPhoneWrap"><VintagePhone active/></div>}
+              {mode==='audio' && <div className="recordingPhoneWrap"><VintagePhone active config={activePhone}/></div>}
               {mode==='video' && <div className="capturePreview"><video ref={videoPreviewRef} muted playsInline/></div>}
               {countdown>0 && <div className="bigCountdown">{countdown}</div>}
               <div className={recording?'timer recording':'timer'}>{String(Math.floor(seconds/60)).padStart(2,'0')}:{String(seconds%60).padStart(2,'0')}</div>
@@ -949,6 +1007,55 @@ export default function VoiceMentoPhase1() {
           </section>
         </div>
 
+        <div className="grid2 phase2Grid phoneStyleRow">
+          <section className="panel phoneStylePanel">
+            <div className="panelHead"><div><span>Phone & booth style</span><small>Customize the physical booth experience</small></div><Phone size={20}/></div>
+            <button className={event.autoMatchTheme!==false?'autoMatchToggle active':'autoMatchToggle'} onClick={()=>saveEvent({...event,autoMatchTheme:event.autoMatchTheme===false})}>
+              <span><Sparkles size={17}/> Auto-match event theme</span><i/>
+            </button>
+            <div className="phoneStylePreview">
+              <VintagePhone config={activePhone}/>
+              <div>
+                <strong>{event.autoMatchTheme!==false?'Theme-matched phone':'Custom phone'}</strong>
+                <span>{BOOTH_STYLES[activeBoothStyle]}</span>
+              </div>
+            </div>
+            <div className={event.autoMatchTheme!==false?'phoneControls disabled':'phoneControls'}>
+              <label>Phone body color<div className="colorInputLine"><input type="color" value={(event.phone||DEFAULT_EVENT.phone).body} disabled={event.autoMatchTheme!==false} onChange={e=>saveEvent({...event,phone:{...DEFAULT_EVENT.phone,...event.phone,body:e.target.value}})}/><span>{(event.phone||DEFAULT_EVENT.phone).body}</span></div></label>
+              <label>Handset color<div className="colorInputLine"><input type="color" value={(event.phone||DEFAULT_EVENT.phone).handset} disabled={event.autoMatchTheme!==false} onChange={e=>saveEvent({...event,phone:{...DEFAULT_EVENT.phone,...event.phone,handset:e.target.value}})}/><span>{(event.phone||DEFAULT_EVENT.phone).handset}</span></div></label>
+              <label>Metal trim<div className="colorInputLine"><input type="color" value={(event.phone||DEFAULT_EVENT.phone).trim} disabled={event.autoMatchTheme!==false} onChange={e=>saveEvent({...event,phone:{...DEFAULT_EVENT.phone,...event.phone,trim:e.target.value}})}/><span>{(event.phone||DEFAULT_EVENT.phone).trim}</span></div></label>
+              <label>Cord color<div className="colorInputLine"><input type="color" value={(event.phone||DEFAULT_EVENT.phone).cord} disabled={event.autoMatchTheme!==false} onChange={e=>saveEvent({...event,phone:{...DEFAULT_EVENT.phone,...event.phone,cord:e.target.value}})}/><span>{(event.phone||DEFAULT_EVENT.phone).cord}</span></div></label>
+              <label>Phone finish
+                <select disabled={event.autoMatchTheme!==false} value={(event.phone||DEFAULT_EVENT.phone).finish} onChange={e=>saveEvent({...event,phone:{...DEFAULT_EVENT.phone,...event.phone,finish:e.target.value}})}>
+                  <option value="glossy">Glossy Enamel</option><option value="matte">Matte</option><option value="aged">Aged / Vintage</option>
+                </select>
+              </label>
+              <label>Booth style
+                <select disabled={event.autoMatchTheme!==false} value={event.boothStyle||'ivory'} onChange={e=>saveEvent({...event,boothStyle:e.target.value})}>
+                  {Object.entries(BOOTH_STYLES).map(([key,label])=><option key={key} value={key}>{label}</option>)}
+                </select>
+              </label>
+            </div>
+            <label>Phone plaque text<input maxLength={20} value={(event.phone||DEFAULT_EVENT.phone).plaque} onChange={e=>saveEvent({...event,phone:{...DEFAULT_EVENT.phone,...event.phone,plaque:e.target.value.toUpperCase()}})} /></label>
+          </section>
+
+          <section className="panel phoneSwatchPanel">
+            <div className="panelHead"><div><span>Quick phone colors</span><small>Turn off Auto-match to use a preset</small></div><Sparkles size={20}/></div>
+            <div className="phoneSwatches">
+              {[
+                ['Ivory','#D7B58C','#2A211D','#B58B6A'],
+                ['Black','#191716','#0D0C0B','#C5A45F'],
+                ['Burgundy','#7F3136','#2B1D1A','#B9915F'],
+                ['Forest','#465A47','#202A22','#B89A65'],
+                ['Navy','#273C59','#111B29','#C3A05A'],
+                ['Blush','#D7A1B5','#654753','#C39A68'],
+                ['Champagne','#CDB38E','#4C3B30','#B79463']
+              ].map(([name,body,handset,trim])=><button key={name} disabled={event.autoMatchTheme!==false} onClick={()=>saveEvent({...event,phone:{...DEFAULT_EVENT.phone,...event.phone,body,handset,trim}})}><i style={{background:body}}/><span>{name}</span></button>)}
+            </div>
+            <p className="securityNote">Auto-match uses the current event theme. Custom colors stay saved with this event.</p>
+          </section>
+        </div>
+
         <div className="grid2 phase2Grid">
           <section className="panel">
             <div className="panelHead"><div><span>Branding & media</span><small>Stored locally on this booth device</small></div><Upload size={20}/></div>
@@ -1100,9 +1207,19 @@ function labelFor(m) {
   return 'Written note'
 }
 
-function VintagePhone({compact=false,ringing=false,active=false}) {
+function VintagePhone({compact=false,ringing=false,active=false,config}) {
+  const phone={...DEFAULT_EVENT.phone,...(config||{})}
   return (
-    <div className={'vintagePhone'+(compact?' compact':'')+(ringing?' ringing':'')+(active?' active':'')} aria-hidden="true">
+    <div
+      className={'vintagePhone finish-'+phone.finish+(compact?' compact':'')+(ringing?' ringing':'')+(active?' active':'')}
+      style={{
+        '--phone-body':phone.body,
+        '--phone-handset':phone.handset,
+        '--phone-trim':phone.trim,
+        '--phone-cord':phone.cord
+      }}
+      aria-hidden="true"
+    >
       <div className="vintagePhoneShadow"/>
       <div className="vintageHandset">
         <span className="receiverCup receiverCupLeft"/>
@@ -1118,7 +1235,7 @@ function VintagePhone({compact=false,ringing=false,active=false}) {
             <span className="dialCenter"><Phone size={compact?12:17} strokeWidth={1.5}/></span>
           </div>
         </div>
-        <div className="vintageNameplate">VOICEMENTO</div>
+        <div className="vintageNameplate">{phone.plaque || 'VOICEMENTO'}</div>
       </div>
       <div className="vintageBase"><span/><span/><span/></div>
       <div className="phoneCord"/>

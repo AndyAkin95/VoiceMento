@@ -1,4 +1,4 @@
-const CACHE = 'voicemento-v11'
+const CACHE = 'voicemento-v12'
 const APP_SHELL = ['./']
 
 self.addEventListener('install', event => {
