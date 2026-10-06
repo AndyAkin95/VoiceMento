@@ -31,3 +31,10 @@ Open http://localhost:3000
 ## Production next step
 
 Connect Supabase for authentication, event/client records, cloud message storage, uploads, QR links, galleries and exports. Browser microphone/camera recording can then be wired to Supabase Storage.
+
+
+## Live demo
+
+GitHub Pages: https://andyakin95.github.io/VoiceMento/
+
+On iPhone/iPad, open the live site in Safari and choose **Share → Add to Home Screen** to install VoiceMento as a standalone web app.
