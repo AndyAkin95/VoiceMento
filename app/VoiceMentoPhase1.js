@@ -195,8 +195,67 @@ function getBoothStyle(event) {
   return event.boothStyle || 'ivory'
 }
 
+
+function makeTableGuestUrl(event) {
+  if (typeof window === 'undefined') return ''
+  const url=new URL(window.location.href)
+  url.search=''
+  url.hash=''
+  const q=url.searchParams
+  q.set('guest','table')
+  q.set('t',(event.title||'VoiceMento').slice(0,80))
+  q.set('d',(event.subtitle||'').slice(0,80))
+  q.set('th',event.theme||'romantic')
+  q.set('a',event.accent||'#B58B6A')
+  q.set('mo',(event.monogram||'').slice(0,24))
+  q.set('f',['audio','video','photo','note'].map(k=>event.features?.[k]?'1':'0').join(''))
+  q.set('frame',event.frame||'floral')
+  return url.toString()
+}
+
+function readTableGuestEvent() {
+  const query=new URLSearchParams(window.location.search)
+  if (query.get('guest')!=='table') return null
+  const theme=query.get('th')
+  const accent=query.get('a')
+  const features=query.get('f')||''
+  const next={
+    ...DEFAULT_EVENT,
+    title:(query.get('t')||DEFAULT_EVENT.title).slice(0,80),
+    subtitle:(query.get('d')||DEFAULT_EVENT.subtitle).slice(0,80),
+    monogram:(query.get('mo')||DEFAULT_EVENT.monogram).slice(0,24),
+    theme:theme && THEME_PRESETS[theme]?theme:DEFAULT_EVENT.theme,
+    accent:accent && /^#[0-9a-fA-F]{6}$/.test(accent)?accent:DEFAULT_EVENT.accent,
+    frame:['floral','vintage','blacktie','gold','polaroid','none'].includes(query.get('frame'))?query.get('frame'):DEFAULT_EVENT.frame
+  }
+  next.ambience=THEME_PRESETS[next.theme]?.ambience||DEFAULT_EVENT.ambience
+  if (/^[01]{4}$/.test(features) && features.includes('1')) {
+    next.features=Object.fromEntries(['audio','video','photo','note'].map((key,i)=>[key,features[i]==='1']))
+  }
+  return next
+}
+
+function guestShareFiles(item) {
+  if (!item) return []
+  if (item.type==='note') return [new File([item.note||''],'VoiceMento-note-'+item.id+'.txt',{type:'text/plain'})]
+  const mime=item.blob?.type||''
+  const ext=item.type==='photo'?'jpg':mime.includes('webm')?'webm':mime.includes('ogg')?'ogg':mime.includes('mp4')?'mp4':'bin'
+  const result=item.blob?[new File([item.blob],'VoiceMento-'+item.type+'-'+item.id+'.'+ext,{type:mime||'application/octet-stream'})]:[]
+  if (item.photoBlob && item.type!=='photo') {
+    result.push(new File([item.photoBlob],'VoiceMento-photo-'+item.id+'.jpg',{type:item.photoBlob.type||'image/jpeg'}))
+  }
+  return result
+}
+
 export default function VoiceMentoPhase1() {
   const [view, setView] = useState('entrance')
+  const [tableGuest, setTableGuest] = useState(false)
+  const [tableGuestUrl, setTableGuestUrl] = useState('')
+  const [tableQrDataUrl, setTableQrDataUrl] = useState('')
+  const [tableQrError, setTableQrError] = useState('')
+  const [tableQrStatus, setTableQrStatus] = useState('')
+  const [lastGuestItem, setLastGuestItem] = useState(null)
+  const [guestShareStatus, setGuestShareStatus] = useState('')
   const [entering, setEntering] = useState(false)
   const [boothZoomStyle, setBoothZoomStyle] = useState(null)
   const [arrivalPhoneScale, setArrivalPhoneScale] = useState(null)
@@ -249,8 +308,14 @@ export default function VoiceMentoPhase1() {
   useEffect(() => {
     if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js').catch(() => {})
     try {
+      const linkedGuest=readTableGuestEvent()
+      if (linkedGuest) {
+        setTableGuest(true)
+        setEvent(linkedGuest)
+        setView('booth')
+      }
       const savedEvent = localStorage.getItem('voicemento_event')
-      if (savedEvent) {
+      if (!linkedGuest && savedEvent) {
         const parsed=JSON.parse(savedEvent)
         setEvent({
           ...DEFAULT_EVENT,
@@ -270,6 +335,21 @@ export default function VoiceMentoPhase1() {
   }, [])
 
   useEffect(() => {
+    if (view!=='admin'||tableGuest) return
+    const url=makeTableGuestUrl(event)
+    setTableGuestUrl(url)
+    setTableQrDataUrl('')
+    setTableQrError('')
+    let active=true
+    import('qrcode').then(mod=>mod.default.toDataURL(url,{
+      errorCorrectionLevel:'M',margin:3,width:720,
+      color:{dark:'#302923',light:'#FFFFFF'}
+    })).then(src=>{if(active)setTableQrDataUrl(src)})
+      .catch(()=>{if(active)setTableQrError('QR preview unavailable. You can still copy the guest link.')})
+    return ()=>{active=false}
+  },[view,tableGuest,event])
+
+  useEffect(() => {
     if (navigator.storage?.estimate) {
       navigator.storage.estimate().then(({usage=0,quota=0})=>setStorageInfo({usage,quota})).catch(()=>{})
     }
@@ -284,7 +364,7 @@ export default function VoiceMentoPhase1() {
   useEffect(() => {
     const activity = () => {
       if (attractRef.current) clearTimeout(attractRef.current)
-      if (view === 'booth' && boothStep === 'choose' && !recording && !preparing) {
+      if (!tableGuest && view === 'booth' && boothStep === 'choose' && !recording && !preparing) {
         attractRef.current = setTimeout(() => exitToEntrance(), 30000)
       }
     }
@@ -296,10 +376,10 @@ export default function VoiceMentoPhase1() {
       window.removeEventListener('keydown', activity)
       if (attractRef.current) clearTimeout(attractRef.current)
     }
-  }, [view, boothStep, recording, preparing])
+  }, [view, boothStep, recording, preparing, tableGuest])
 
   useEffect(() => {
-    if (boothStep !== 'saved') return
+    if (boothStep !== 'saved' || tableGuest) return
     setResetCountdown(RESET_SECONDS)
     const interval = setInterval(() => {
       setResetCountdown(v => {
@@ -312,7 +392,7 @@ export default function VoiceMentoPhase1() {
       })
     }, 1000)
     return () => clearInterval(interval)
-  }, [boothStep])
+  }, [boothStep, tableGuest])
 
   const stats = useMemo(() => ({
     total: messages.length,
@@ -408,6 +488,7 @@ export default function VoiceMentoPhase1() {
   }
 
   function openAdmin() {
+    if (tableGuest) return
     setPin('')
     setPinError(false)
     setShowAdminGate(true)
@@ -464,7 +545,9 @@ export default function VoiceMentoPhase1() {
     setBoothZoomStyle(null)
     setArrivalPhoneScale(null)
     resetGuestSession()
-    setView('entrance')
+    setLastGuestItem(null)
+    setGuestShareStatus('')
+    setView(tableGuest ? 'booth' : 'entrance')
   }
 
   function enterBooth(e) {
