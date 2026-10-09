@@ -30,6 +30,16 @@ const DEFAULT_EVENT = {
   greetingData: '',
   autoMatchTheme: true,
   boothStyle: 'ivory',
+  boothCustom: false,
+  booth: {
+    panel: '#EEE2D2',
+    trim: '#B58B6A',
+    interior: '#584639',
+    sign: 'VOICEMENTO',
+    caption: 'STEP INSIDE',
+    size: 112,
+    door: 'glass'
+  },
   phone: {
     body: '#D7B58C',
     handset: '#2A211D',
@@ -180,7 +190,7 @@ function getPhoneConfig(event) {
 }
 
 function getBoothStyle(event) {
-  if (event.autoMatchTheme !== false) return (THEME_PHONE[event.theme]||THEME_PHONE.romantic).booth
+  if (!event.boothCustom && event.autoMatchTheme !== false) return (THEME_PHONE[event.theme]||THEME_PHONE.romantic).booth
   return event.boothStyle || 'ivory'
 }
 
@@ -236,6 +246,7 @@ export default function VoiceMentoPhase1() {
           ...DEFAULT_EVENT,
           ...parsed,
           phone:{...DEFAULT_EVENT.phone,...(parsed.phone||{})},
+          booth:{...DEFAULT_EVENT.booth,...(parsed.booth||{})},
           features:{...DEFAULT_EVENT.features,...(parsed.features||{})}
         })
       }
@@ -442,11 +453,12 @@ export default function VoiceMentoPhase1() {
   function enterBooth() {
     if (entering) return
     setEntering(true)
+    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
     setTimeout(() => {
       resetGuestSession()
       setView('booth')
       setEntering(false)
-    }, 1700)
+    }, reduceMotion ? 120 : 1100)
   }
 
   async function runCountdown() {
@@ -771,15 +783,7 @@ export default function VoiceMentoPhase1() {
         </section>
         <button className="boothStage" onClick={enterBooth} aria-label="Enter VoiceMento">
           <span className="floorShadow"/><span className="boothGlow"/>
-          <span className={'phoneBooth boothStyle-'+activeBoothStyle}>
-            <span className="boothTopCap"/><span className="boothCrown">VOICEMENTO</span>
-            <span className="boothBody">
-              <span className="boothInterior"><VintagePhone compact config={activePhone}/><small>STEP INSIDE</small></span>
-              <span className="boothDoor boothDoorLeft"><span className="doorGlass"><span/><span/><span/><span/><span/><span/></span><span className="doorPanelDetail"/><span className="doorHandle"/></span>
-              <span className="boothDoor boothDoorRight"><span className="doorGlass"><span/><span/><span/><span/><span/><span/></span><span className="doorPanelDetail"/><span className="doorHandle"/></span>
-            </span>
-            <span className="boothBase"/>
-          </span>
+          <BoothModel event={event} phone={activePhone}/>
           <span className="tapLabel">{entering?'Come on in…':'Tap the booth to enter'}</span>
         </button>
         <p className="poweredBy">VOICEMENTO · DIGITAL EVENT GUESTBOOK</p>
@@ -1009,9 +1013,9 @@ export default function VoiceMentoPhase1() {
 
         <div className="grid2 phase2Grid phoneStyleRow">
           <section className="panel phoneStylePanel">
-            <div className="panelHead"><div><span>Phone & booth style</span><small>Customize the physical booth experience</small></div><Phone size={20}/></div>
+            <div className="panelHead"><div><span>Vintage telephone</span><small>Choose the colors and finish of the guestbook phone</small></div><Phone size={20}/></div>
             <button className={event.autoMatchTheme!==false?'autoMatchToggle active':'autoMatchToggle'} onClick={()=>saveEvent({...event,autoMatchTheme:event.autoMatchTheme===false})}>
-              <span><Sparkles size={17}/> Auto-match event theme</span><i/>
+              <span><Sparkles size={17}/> Auto-match phone to event theme</span><i/>
             </button>
             <div className="phoneStylePreview">
               <VintagePhone config={activePhone}/>
@@ -1028,11 +1032,6 @@ export default function VoiceMentoPhase1() {
               <label>Phone finish
                 <select disabled={event.autoMatchTheme!==false} value={(event.phone||DEFAULT_EVENT.phone).finish} onChange={e=>saveEvent({...event,phone:{...DEFAULT_EVENT.phone,...event.phone,finish:e.target.value}})}>
                   <option value="glossy">Glossy Enamel</option><option value="matte">Matte</option><option value="aged">Aged / Vintage</option>
-                </select>
-              </label>
-              <label>Booth style
-                <select disabled={event.autoMatchTheme!==false} value={event.boothStyle||'ivory'} onChange={e=>saveEvent({...event,boothStyle:e.target.value})}>
-                  {Object.entries(BOOTH_STYLES).map(([key,label])=><option key={key} value={key}>{label}</option>)}
                 </select>
               </label>
             </div>
@@ -1055,6 +1054,49 @@ export default function VoiceMentoPhase1() {
             <p className="securityNote">Auto-match uses the current event theme. Custom colors stay saved with this event.</p>
           </section>
         </div>
+
+        <section className="panel boothDesignerPanel">
+          <div className="panelHead"><div><span>Booth designer</span><small>Customize the entrance separately from the telephone</small></div><Sparkles size={20}/></div>
+          <div className="boothDesignerLayout">
+            <div className="boothDesignerPreview">
+              <div className="boothStage boothStagePreview" aria-label="Live preview of your booth">
+                <BoothModel event={event} phone={activePhone}/>
+              </div>
+              <span>Live booth preview</span>
+            </div>
+            <div className="boothDesignerSettings">
+              <button className={event.boothCustom?'autoMatchToggle active':'autoMatchToggle'} onClick={()=>saveEvent({...event,boothCustom:!event.boothCustom,boothStyle:activeBoothStyle})}>
+                <span><Sparkles size={17}/> Enable custom booth colors</span><i/>
+              </button>
+              <label>Booth design
+                <select value={activeBoothStyle} disabled={!event.boothCustom && event.autoMatchTheme!==false} onChange={e=>saveEvent({...event,boothStyle:e.target.value})}>
+                  {Object.entries(BOOTH_STYLES).map(([key,label])=><option key={key} value={key}>{label}</option>)}
+                </select>
+              </label>
+              <div className="boothColorGrid">
+                {[
+                  ['Panel color','panel'],
+                  ['Frame & metal trim','trim'],
+                  ['Interior color','interior']
+                ].map(([label,key])=><label key={key}>{label}<div className="colorInputLine"><input type="color" value={(event.booth||DEFAULT_EVENT.booth)[key]} disabled={!event.boothCustom} onChange={e=>saveEvent({...event,booth:{...DEFAULT_EVENT.booth,...event.booth,[key]:e.target.value}})}/><span>{(event.booth||DEFAULT_EVENT.booth)[key]}</span></div></label>)}
+              </div>
+              <div className="boothCopyGrid">
+                <label>Top sign<input maxLength={20} value={(event.booth||DEFAULT_EVENT.booth).sign} onChange={e=>saveEvent({...event,booth:{...DEFAULT_EVENT.booth,...event.booth,sign:e.target.value.toUpperCase()}})}/></label>
+                <label>Inside sign<input maxLength={22} value={(event.booth||DEFAULT_EVENT.booth).caption} onChange={e=>saveEvent({...event,booth:{...DEFAULT_EVENT.booth,...event.booth,caption:e.target.value.toUpperCase()}})}/></label>
+              </div>
+              <label>Door design
+                <select value={(event.booth||DEFAULT_EVENT.booth).door} onChange={e=>saveEvent({...event,booth:{...DEFAULT_EVENT.booth,...event.booth,door:e.target.value}})}>
+                  <option value="glass">Classic glass panels</option><option value="arched">Arched glass panels</option><option value="private">Private frosted glass</option>
+                </select>
+              </label>
+              <label className="boothSizeLabel">Booth size <strong>{(event.booth||DEFAULT_EVENT.booth).size}%</strong>
+                <input type="range" min="100" max="126" step="2" value={(event.booth||DEFAULT_EVENT.booth).size} onChange={e=>saveEvent({...event,booth:{...DEFAULT_EVENT.booth,...event.booth,size:Number(e.target.value)}})}/>
+                <span>A little larger by default; adjust to suit the screen.</span>
+              </label>
+              <p className="securityNote">Sign, door and size settings are always available. Enable custom colors to override the event theme for the booth only.</p>
+            </div>
+          </div>
+        </section>
 
         <div className="grid2 phase2Grid">
           <section className="panel">
@@ -1207,6 +1249,32 @@ function labelFor(m) {
   return 'Written note'
 }
 
+function BoothModel({event,phone}) {
+  const booth={...DEFAULT_EVENT.booth,...(event.booth||{})}
+  const style=getBoothStyle(event)
+  const scale=Math.max(1,Math.min(1.26,(Number(booth.size)||112)/100))
+  return (
+    <span
+      className={'phoneBooth boothStyle-'+style+(event.boothCustom?' boothCustom':'')+' boothDoors-'+booth.door}
+      style={{
+        '--booth-scale':scale,
+        '--booth-zoom':scale*5.4,
+        '--booth-panel':booth.panel,
+        '--booth-metal':booth.trim,
+        '--booth-inside':booth.interior
+      }}
+    >
+      <span className="boothTopCap"/><span className="boothCrown">{booth.sign || 'VOICEMENTO'}</span>
+      <span className="boothBody">
+        <span className="boothInterior"><VintagePhone compact config={phone}/><small>{booth.caption || 'STEP INSIDE'}</small></span>
+        <span className="boothDoor boothDoorLeft"><span className="doorGlass"><span/><span/><span/><span/><span/><span/></span><span className="doorPanelDetail"/><span className="doorHandle"/></span>
+        <span className="boothDoor boothDoorRight"><span className="doorGlass"><span/><span/><span/><span/><span/><span/></span><span className="doorPanelDetail"/><span className="doorHandle"/></span>
+      </span>
+      <span className="boothBase"/>
+    </span>
+  )
+}
+
 function VintagePhone({compact=false,ringing=false,active=false,config}) {
   const phone={...DEFAULT_EVENT.phone,...(config||{})}
   return (
@@ -1222,23 +1290,25 @@ function VintagePhone({compact=false,ringing=false,active=false,config}) {
     >
       <div className="vintagePhoneShadow"/>
       <div className="vintageHandset">
-        <span className="receiverCup receiverCupLeft"/>
-        <span className="receiverBar"/>
-        <span className="receiverCup receiverCupRight"/>
+        <span className="receiverCup receiverCupLeft"><i className="receiverGrille"/></span>
+        <span className="receiverBar"><i className="receiverBarInset"/></span>
+        <span className="receiverCup receiverCupRight"><i className="receiverGrille"/></span>
       </div>
       <div className="vintageCradle"><i/><i/></div>
       <div className="vintageBody">
         <div className="vintageCrest">VM</div>
+        <span className="phoneRivet phoneRivetLeft"/><span className="phoneRivet phoneRivetRight"/>
         <div className="rotaryBezel">
           <div className="rotaryDial">
-            {Array.from({length:10}).map((_,i)=><i key={i} style={{'--n':i}}/> )}
+            {Array.from({length:10}).map((_,i)=><i key={i} style={{'--n':i}}><b>{(i+1)%10}</b></i>)}
             <span className="dialCenter"><Phone size={compact?12:17} strokeWidth={1.5}/></span>
+            <span className="dialFingerStop"/>
           </div>
         </div>
         <div className="vintageNameplate">{phone.plaque || 'VOICEMENTO'}</div>
       </div>
-      <div className="vintageBase"><span/><span/><span/></div>
-      <div className="phoneCord"/>
+      <div className="vintageBase"><span/><span/><span/><i className="baseScrew baseScrewLeft"/><i className="baseScrew baseScrewRight"/></div>
+      <div className="phoneCord"><span className="cordCoils"/></div>
     </div>
   )
 }
