@@ -878,7 +878,13 @@ export default function VoiceMentoPhase1() {
 
           {boothStep === 'choose' && (
             <>
-              <div className="openedBoothPhone"><VintagePhone ringing config={activePhone}/></div>
+              <div className="openedBoothPhone boothInteriorDisplay" style={{
+                '--booth-panel':(event.booth||DEFAULT_EVENT.booth).panel,
+                '--booth-metal':(event.booth||DEFAULT_EVENT.booth).trim,
+                '--booth-inside':(event.booth||DEFAULT_EVENT.booth).interior
+              }}>
+                <BoothAlcove phone={activePhone} ringing/>
+              </div>
               <p className="phasePrompt">Pick up a memory and leave something they’ll keep forever.</p>
               {event.greetingData&&<button className="greetingButton" onClick={()=>new Audio(event.greetingData).play().catch(()=>{})}><Volume2 size={17}/> Hear a welcome from the hosts</button>}
               <input className="guestNameInput" value={guestName} onChange={e=>setGuestName(e.target.value)} placeholder="Your name(s) — optional"/>
@@ -1315,11 +1321,33 @@ function BoothModel({event,phone}) {
     >
       <span className="boothTopCap"/><span className="boothCrown">{booth.sign || 'VOICEMENTO'}</span>
       <span className="boothBody">
-        <span className="boothInterior"><VintagePhone compact config={phone}/><small>{booth.caption || 'STEP INSIDE'}</small></span>
+        <span className="boothInterior">
+          <BoothAlcove phone={phone} compact caption={booth.caption || 'STEP INSIDE'}/>
+        </span>
         <span className="boothDoor boothDoorLeft"><span className="doorGlass"><span/><span/><span/><span/><span/><span/></span><span className="doorPanelDetail"/><span className="doorHandle"/></span>
         <span className="boothDoor boothDoorRight"><span className="doorGlass"><span/><span/><span/><span/><span/><span/></span><span className="doorPanelDetail"/><span className="doorHandle"/></span>
       </span>
       <span className="boothBase"/>
+    </span>
+  )
+}
+
+function BoothAlcove({phone,compact=false,ringing=false,caption=''}) {
+  return (
+    <span className={'boothAlcove '+(compact?'boothAlcoveMini':'boothAlcoveGuest')}>
+      <span className="boothBackWall"/>
+      <span className="boothWallTrim boothWallTrimLeft"/>
+      <span className="boothWallTrim boothWallTrimRight"/>
+      <span className="boothSideWall boothSideWallLeft"/>
+      <span className="boothSideWall boothSideWallRight"/>
+      <span className="boothCeilingGlow"><i/></span>
+      <span className="boothPhoneMount"><i/><i/></span>
+      <span className="boothShelfBracket boothShelfBracketLeft"/>
+      <span className="boothShelfBracket boothShelfBracketRight"/>
+      <span className="boothPhoneShelf"/>
+      <span className="boothPhoneWrap"><VintagePhone compact={compact} ringing={ringing} config={phone}/></span>
+      <span className="boothFloor"/>
+      {caption && <small className="boothInteriorCaption">{caption}</small>}
     </span>
   )
 }
