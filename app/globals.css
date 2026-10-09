@@ -444,3 +444,13 @@ body{min-height:100%;background:#f5f0ea}
   .entering .boothStage .boothDoor{transition:none!important}
   .entering .entranceCopy,.entering .adminLock,.entering .poweredBy{animation:none!important}
 }
+
+/* Hide lettering behind the receiver during booth entry */
+.entering .boothInterior small{
+  opacity:0!important;
+  visibility:hidden!important;
+  transition:none!important;
+}
+.entering .entranceCopy{
+  animation:fadeAway .22s ease-out forwards!important;
+}
