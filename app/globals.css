@@ -257,3 +257,165 @@ body{min-height:100%;background:#f5f0ea}
 .boothInterior small{display:block!important;width:100%!important;text-align:center!important;margin-left:0!important;margin-right:0!important;letter-spacing:.11em!important}
 .tapLabel{display:block!important;width:100%!important;text-align:center!important;margin-left:auto!important;margin-right:auto!important}
 @media(max-width:700px){.phoneControls{grid-template-columns:1fr}.phoneStylePreview{height:190px}.phoneStylePreview .vintagePhone{--phone-scale:.62}.phoneSwatches{grid-template-columns:1fr 1fr}}
+
+/* VoiceMento booth designer / single continuous zoom */
+.weddingEntrance .boothStage{width:min(520px,48vw)}
+.weddingEntrance .phoneBooth{
+  transform:scale(var(--booth-scale,1.12));
+  transform-origin:50% 50%;
+  transition:transform 1.08s cubic-bezier(.18,.72,.19,1),filter .7s ease;
+  will-change:transform;
+}
+.weddingEntrance .boothStage:hover .phoneBooth{
+  transform:translateY(-4px) scale(var(--booth-scale,1.12));
+}
+.entering .boothStage{z-index:18!important;filter:none!important;pointer-events:none}
+.entering .boothStage .phoneBooth,
+.entering .boothStage:hover .phoneBooth{
+  transform:translateY(8%) scale(var(--booth-zoom,5.8))!important;
+  filter:none!important;
+}
+.entering .boothStage .boothDoorLeft{transform:rotateY(-113deg)}
+.entering .boothStage .boothDoorRight{transform:rotateY(113deg)}
+.entering .boothDoor{transition:transform .53s cubic-bezier(.16,.82,.29,1)}
+.entering .entranceCopy,.entering .adminLock,.entering .poweredBy{
+  animation:fadeAway .42s forwards;
+}
+.entering .tapLabel{opacity:0;transition:opacity .2s}
+.entering:after{content:none!important;display:none!important;animation:none!important}
+.boothDoors-arched .doorGlass{border-radius:54% 54% 6px 6px / 24% 24% 6px 6px;top:6%;height:57%}
+.boothDoors-private .doorGlass{background:linear-gradient(130deg,rgba(255,255,255,.96),rgba(229,235,230,.91));backdrop-filter:blur(9px)}
+.boothDoors-private .doorGlass>span{opacity:.26}
+.phoneBooth.boothCustom .boothTopCap,.phoneBooth.boothCustom .boothCrown{
+  background:linear-gradient(180deg,color-mix(in srgb,var(--booth-panel) 72%,white),var(--booth-panel))!important;
+  border-color:var(--booth-metal)!important;
+  color:color-mix(in srgb,var(--booth-metal) 67%,#201612)!important;
+}
+.phoneBooth.boothCustom .boothBody{
+  border-color:var(--booth-metal)!important;
+  background:linear-gradient(90deg,color-mix(in srgb,var(--booth-panel) 73%,#392a20),var(--booth-panel) 11%,color-mix(in srgb,var(--booth-panel) 80%,white) 51%,var(--booth-panel) 90%,color-mix(in srgb,var(--booth-panel) 76%,#392a20))!important;
+}
+.phoneBooth.boothCustom .boothBody:before,.phoneBooth.boothCustom .boothBody:after{
+  background:linear-gradient(90deg,var(--booth-metal),color-mix(in srgb,var(--booth-metal) 52%,white),var(--booth-metal))!important;
+}
+.phoneBooth.boothCustom .boothDoor{
+  background:linear-gradient(90deg,color-mix(in srgb,var(--booth-panel) 82%,#6c4a30),color-mix(in srgb,var(--booth-panel) 65%,white) 50%,var(--booth-panel))!important;
+  border-color:var(--booth-metal)!important;
+}
+.phoneBooth.boothCustom .doorGlass,.phoneBooth.boothCustom .doorPanelDetail{border-color:var(--booth-metal)!important}
+.phoneBooth.boothCustom .doorHandle{background:var(--booth-metal)!important}
+.phoneBooth.boothCustom .boothInterior{
+  background:radial-gradient(circle at 50% 27%,color-mix(in srgb,var(--booth-inside) 32%,white),var(--booth-inside) 92%)!important;
+}
+.phoneBooth.boothCustom .boothBase{
+  border-color:var(--booth-metal)!important;
+  background:linear-gradient(color-mix(in srgb,var(--booth-panel) 75%,white),var(--booth-panel))!important;
+}
+.boothDesignerPanel{margin-top:18px;overflow:hidden}
+.boothDesignerLayout{display:grid;grid-template-columns:minmax(240px,.85fr) minmax(0,1.35fr);gap:22px;align-items:start}
+.boothDesignerPreview{
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  min-height:384px;padding:14px 10px 18px;border:1px solid #e4d8ce;border-radius:18px;
+  background:radial-gradient(ellipse at 50% 36%,#fffdf9,#efe5da 80%);
+  overflow:hidden;
+}
+.boothDesignerPreview>span{font-family:Georgia,serif;font-style:italic;color:#8b7565;font-size:12px;letter-spacing:.04em}
+.boothStage.boothStagePreview{
+  display:flex!important;flex-direction:column!important;position:relative;
+  width:260px!important;height:342px!important;min-width:0!important;min-height:0!important;
+  max-width:100%!important;margin:0!important;cursor:default!important;pointer-events:none!important;
+}
+.boothStagePreview .phoneBooth{
+  width:180px!important;height:260px!important;min-width:0!important;min-height:0!important;
+  max-width:none!important;max-height:none!important;
+  transform:scale(var(--booth-scale,1.12))!important;transform-origin:50% 50%;
+}
+.boothStagePreview .phoneBooth .boothCrown{font-size:10px!important}
+.boothStagePreview .boothInterior small{font-size:8px}
+.boothStagePreview .boothInterior .vintagePhone{--phone-scale:.39}
+.boothStagePreview .boothDoor{transition:none}
+.boothDesignerSettings{display:grid;gap:12px}
+.boothDesignerSettings>.autoMatchToggle{margin:0 0 2px}
+.boothDesignerSettings label{margin:0}
+.boothColorGrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.boothColorGrid .colorInputLine{margin-top:6px}
+.boothCopyGrid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.boothSizeLabel{display:flex;flex-wrap:wrap;gap:6px;justify-content:space-between}
+.boothSizeLabel input{flex:0 0 100%;accent-color:#ad896a;cursor:pointer}
+.boothSizeLabel>span{font-size:11px;color:#93867d;font-weight:400}
+.boothSizeLabel strong{font-variant-numeric:tabular-nums}
+.vintagePhone .receiverCup{overflow:hidden}
+.receiverGrille{
+  position:absolute;inset:7px 6px;border-radius:50%;
+  background:radial-gradient(circle,rgba(215,196,166,.68) 0 1px,transparent 1.4px) center / 6px 6px,
+    radial-gradient(ellipse at 45% 36%,rgba(22,15,12,.26),rgba(0,0,0,.63));
+  border:1px solid rgba(0,0,0,.34);box-shadow:inset 0 1px 3px #110f0d,0 1px rgba(255,255,255,.18);
+}
+.receiverBarInset{
+  position:absolute;left:9px;right:9px;top:2px;height:3px;border-radius:10px;
+  background:rgba(255,255,255,.16);
+}
+.vintagePhone .vintageCrest{
+  text-shadow:0 1px rgba(255,255,255,.55);font-size:9px;letter-spacing:.19em;
+}
+.vintagePhone .rotaryBezel{width:72px;height:72px;top:24px;box-shadow:inset 0 0 0 2px rgba(255,255,255,.45),inset 0 0 0 6px rgba(92,60,34,.13),0 3px 7px rgba(62,40,26,.25)}
+.vintagePhone .rotaryDial>i{
+  width:12px;height:12px;margin:-6px;
+  transform:rotate(calc(var(--n) * 36deg)) translateY(-25px);
+  display:grid;place-items:center;box-shadow:inset 0 1px 3px rgba(80,50,28,.25),0 0 0 1px rgba(255,255,255,.3);
+}
+.vintagePhone .rotaryDial>i b{
+  color:#68503c;font:700 7px/1 Georgia,serif;
+  transform:rotate(calc(var(--n) * -36deg));
+}
+.vintagePhone .dialCenter{
+  width:28px;height:28px;box-shadow:inset 0 0 0 3px rgba(255,255,255,.23),0 1px 2px rgba(0,0,0,.19);
+}
+.dialFingerStop{
+  position:absolute;left:72%;top:77%;width:19px;height:5px;border-radius:4px;
+  background:linear-gradient(#fff7e4,var(--phone-trim),#795533);
+  border:1px solid rgba(65,43,25,.42);transform:rotate(-44deg);
+  box-shadow:0 2px 3px rgba(45,30,20,.32);
+}
+.phoneRivet{
+  position:absolute;top:26px;width:5px;height:5px;border-radius:50%;
+  background:radial-gradient(circle at 30% 26%,#fff8e9,var(--phone-trim) 65%,#705137);
+  box-shadow:0 0 0 1px rgba(74,46,31,.32);
+}
+.phoneRivetLeft{left:15px}.phoneRivetRight{right:15px}
+.vintageBase .baseScrew{
+  position:absolute;z-index:4;top:7px;width:7px;height:7px;border-radius:50%;
+  background:radial-gradient(circle at 30% 25%,#fff0d7,var(--phone-trim) 70%,#5e412c);
+  border:1px solid rgba(45,32,23,.3);
+}
+.vintageBase .baseScrewLeft{left:8px}.vintageBase .baseScrewRight{right:8px}
+.phoneCord .cordCoils{
+  position:absolute;right:-9px;top:21px;width:14px;height:66px;border-radius:9px;
+  background:repeating-linear-gradient(0deg,var(--phone-cord) 0 3px,color-mix(in srgb,var(--phone-cord) 44%,white) 3px 5px,transparent 5px 8px);
+  transform:rotate(-5deg);opacity:.95;filter:drop-shadow(1px 1px 1px rgba(0,0,0,.22));
+}
+.openedBoothPhone .vintagePhone{--phone-scale:1.06}
+@media(max-width:900px){
+  .weddingEntrance .boothStage{width:min(415px,89vw)}
+  .boothDesignerLayout{grid-template-columns:1fr}
+  .boothDesignerPreview{min-height:370px}
+}
+@media(max-width:700px){
+  .openedBoothPhone .vintagePhone{--phone-scale:.84}
+  .recordingPhoneWrap .vintagePhone{--phone-scale:.85}
+  .boothColorGrid{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media(max-width:560px){
+  .weddingEntrance .boothStage{width:min(352px,93vw)}
+  .boothDesignerPreview{min-height:355px}
+  .boothCopyGrid{grid-template-columns:1fr}
+}
+@media(max-width:430px){
+  .openedBoothPhone .vintagePhone{--phone-scale:.73}
+  .recordingPhoneWrap .vintagePhone{--phone-scale:.74}
+}
+@media(prefers-reduced-motion:reduce){
+  .weddingEntrance .phoneBooth,.entering .boothStage .phoneBooth{transition:none!important;transform:scale(var(--booth-scale,1.12))!important}
+  .entering .boothStage .boothDoor{transition:none!important}
+  .entering .entranceCopy,.entering .adminLock,.entering .poweredBy{animation:none!important}
+}
