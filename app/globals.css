@@ -828,3 +828,79 @@ body{min-height:100%;background:#f5f0ea}
   .boothJustArrived .guestExit,
   .boothJustArrived .boothAdmin{animation:none}
 }
+
+/* Branded QR table cards, with a dedicated clean print layout. */
+.tableQrPanel{scroll-margin-top:22px}
+.tableQrLayout{display:grid;grid-template-columns:minmax(240px,350px) 1fr;gap:clamp(20px,3vw,36px);align-items:center;margin-top:16px}
+.tableQrPrintCard{
+  width:100%;
+  min-height:465px;
+  padding:29px 24px 22px;
+  background:#fffaf4;
+  border:2px solid color-mix(in srgb,var(--qr-accent,#B58B6A) 44%,#dfd5c9);
+  outline:1px solid color-mix(in srgb,var(--qr-accent,#B58B6A) 40%,transparent);
+  outline-offset:-12px;
+  border-radius:18px;
+  text-align:center;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  box-shadow:0 15px 40px rgba(63,43,28,.1);
+  color:#49372c;
+}
+.tableQrEyebrow{font-size:11px;letter-spacing:.19em;color:var(--qr-accent);font-weight:750;margin:9px 0 14px}
+.tableQrPrintCard h2{font:400 clamp(25px,3vw,32px)/1.14 Georgia,serif;margin:0 0 7px;color:#3a2b24;overflow-wrap:anywhere}
+.tableQrSubtitle{font:13px/1.4 Georgia,serif;color:#8a7566;margin:0 0 13px}
+.tableQrImageBox{
+  width:min(210px,100%);
+  aspect-ratio:1;
+  background:white;
+  padding:8px;
+  border-radius:12px;
+  border:1px solid #e7ded6;
+  display:grid;
+  place-items:center;
+  color:#b2a093;
+  margin:0 auto 12px;
+}
+.tableQrImageBox img{display:block;width:100%;height:100%;object-fit:contain;image-rendering:auto}
+.tableQrAction{font-size:13px;letter-spacing:.10em;font-weight:800;color:#5b4437;margin:3px 0 4px}
+.tableQrFooter{font:12px Georgia,serif;color:#a18e80;margin:0 0 18px}
+.tableQrBrand{margin:auto 0 0;font-size:11px;font-weight:800;letter-spacing:.22em;color:var(--qr-accent)}
+.tableQrControls h3{font:400 25px Georgia,serif;color:#342a24;margin:0 0 12px}
+.tableQrControls>p:not(.tableQrWarning){font-size:14px;color:#756961;line-height:1.65;max-width:530px}
+.tableQrButtons{display:flex;flex-wrap:wrap;gap:10px;margin:22px 0}
+.tableQrButtons button,.tableQrButtons a{
+  display:inline-flex;align-items:center;justify-content:center;gap:9px;
+  padding:11px 16px;text-decoration:none;
+  border:1px solid #d9c9bb;background:#fffaf6;color:#4a3c32;
+  border-radius:999px;font-size:13px;font-weight:600;min-height:43px;
+}
+.tableQrButtons button:disabled{opacity:.45;cursor:not-allowed}
+.tableQrUrlLabel{display:block;font-size:12px;color:#68574d;font-weight:600}
+.tableQrUrlLabel input{display:block;width:100%;padding:12px 14px;border:1px solid #ddd0c3;border-radius:9px;color:#584c43;background:#fbf7f3;font-size:12px;margin-top:6px}
+.tableQrWarning{margin:18px 0 0;padding:14px 16px;border:1px solid #e7cba6;border-radius:12px;background:#fff7e9;color:#68513a!important;font-size:12px!important;line-height:1.55!important}
+.savedMoment .recordBtn,.savedMoment .secondary{display:inline-flex;justify-content:center;align-items:center;gap:8px;margin:4px 5px 8px}
+@media(max-width:760px){
+  .tableQrLayout{grid-template-columns:minmax(0,1fr)}
+  .tableQrPrintCard{max-width:350px;margin:0 auto}
+  .tableQrControls h3{text-align:center}
+  .tableQrButtons{justify-content:center}
+}
+@media print{
+  @page{size:4in 6in;margin:0}
+  html,body{margin:0!important;padding:0!important;background:white!important;overflow:visible!important}
+  body *{visibility:hidden!important}
+  .tableQrPrintCard,.tableQrPrintCard *{visibility:visible!important}
+  .tableQrPrintCard{
+    position:fixed!important;left:0!important;top:0!important;
+    margin:0!important;width:4in!important;height:6in!important;max-width:none!important;
+    padding:.28in!important;
+    border:1px solid #c3a88e!important;outline:1px solid #d7bdac!important;
+    outline-offset:-.13in!important;border-radius:0!important;
+    box-shadow:none!important;break-inside:avoid!important;
+    print-color-adjust:exact;-webkit-print-color-adjust:exact;
+  }
+  .tableQrImageBox{width:2.25in!important}
+  .tableQrPrintCard h2{font-size:26pt!important}
+}
