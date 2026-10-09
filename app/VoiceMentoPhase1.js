@@ -1321,6 +1321,58 @@ export default function VoiceMentoPhase1() {
           <button className="launch" onClick={()=>setView('entrance')}><Play size={18} fill="currentColor"/> Preview guest experience</button>
         </header>
 
+
+        <section className="panel cloudPanel" id="cloudSettings">
+          <div className="panelHead"><div><span>Local + Cloud backup</span><small>Save on this device AND privately to Supabase</small></div><Save size={22}/></div>
+          <p className="cloudIntro">Local recording always stays enabled. Add a dedicated Supabase project to upload a second copy automatically. Guest QR links will then deliver memories straight to your private cloud gallery.</p>
+          <div className="cloudSettingsGrid">
+            <label>Supabase project URL
+              <input placeholder="https://your-project.supabase.co" value={cloudConfig.url} onChange={e=>updateCloudConfig('url',e.target.value)}/>
+            </label>
+            <label>Publishable API key (not a secret or service-role key)
+              <input placeholder="sb_publishable_..." value={cloudConfig.key} onChange={e=>updateCloudConfig('key',e.target.value)}/>
+            </label>
+          </div>
+          <p className="cloudSmallInfo">First create a <strong>separate VoiceMento project</strong> in Supabase and run the secure <a href="https://github.com/AndyAkin95/VoiceMento/blob/main/supabase/voicemento-cloud.sql" target="_blank" rel="noopener noreferrer">VoiceMento SQL setup</a>. Then copy its project URL and publishable key here. Never paste a service-role or secret key.</p>
+          {cloud && !cloudUser && (
+            <div className="cloudLogin">
+              <label>Cloud owner email<input type="email" value={cloudEmail} onChange={e=>setCloudEmail(e.target.value)} placeholder="you@example.com"/></label>
+              <label>Cloud owner password<input type="password" value={cloudPassword} onChange={e=>setCloudPassword(e.target.value)} placeholder="Supabase Auth password"/></label>
+              <button className="secondary" onClick={signInCloud}><LockKeyhole size={16}/> Sign in to cloud</button>
+              <p className="cloudSmallInfo">Create the event owner's email/password account in Supabase Authentication before signing in.</p>
+            </div>
+          )}
+          {cloudUser && <p className="cloudSignedIn"><CheckCircle2 size={16}/> Signed in: {cloudUser.email} <button className="secondary compact" onClick={async()=>{await cloud.auth.signOut();setCloudUser(null);setCloudItems([])}}>Sign out</button></p>}
+          {cloudUser && !validCloudEvent(cloudConfig) && <button className="recordBtn cloudCreateEvent" onClick={createCloudEvent}><QrCode size={17}/> Create private cloud event</button>}
+          {cloudUser && validCloudEvent(cloudConfig) && <p className="cloudSignedIn"><CheckCircle2 size={16}/> Private event ready. Generate a fresh table QR code below.</p>}
+          <div className="cloudSettingsGrid cloudEventIds">
+            <label>Event ID<input value={cloudConfig.eventId} placeholder="Created automatically" onChange={e=>updateCloudConfig('eventId',e.target.value)}/></label>
+            <label>Guest invite code<input value={cloudConfig.guestCode} placeholder="Created automatically" onChange={e=>updateCloudConfig('guestCode',e.target.value)}/></label>
+          </div>
+          {cloudStatus && <p className="cloudFeedback">{cloudStatus}</p>}
+          <p className="cloudStorageStatus">{validCloudEvent(cloudConfig)?'Cloud configured · automatic dual-save enabled for new recordings':'Local save active · cloud setup not finished'}</p>
+          {cloudUser && validCloudEvent(cloudConfig) && (
+            <div className="cloudGallery">
+              <div className="cloudGalleryHeader"><h3>Private cloud gallery</h3><button className="secondary" onClick={refreshCloudGallery} disabled={cloudGalleryBusy}><Images size={16}/> {cloudGalleryBusy?'Loading…':'Refresh cloud memories'}</button></div>
+              {cloudGalleryStatus && <p className="cloudSmallInfo">{cloudGalleryStatus}</p>}
+              {cloudItems.map(item=>(
+                <div className="cloudMemoryItem" key={item.id}>
+                  <div><strong>{item.guest_name}</strong><span>{item.kind} · {new Date(item.created_at).toLocaleString()}</span></div>
+                  {item.kind==='note' && <p>{item.note}</p>}
+                  {item.kind==='audio' && item.url && <audio src={item.url} controls preload="none"/>}
+                  {item.kind==='video' && item.url && <video src={item.url} controls playsInline preload="none"/>}
+                  {item.kind==='photo' && item.url && <img src={item.url} alt={'Photo from '+item.guest_name}/>}
+                  {item.photoUrl && <img src={item.photoUrl} alt={'Attachment from '+item.guest_name}/>}
+                  <div className="cloudMemoryActions">
+                    {item.url && <a href={item.url} target="_blank" rel="noopener noreferrer">Download media</a>}
+                    <button className="secondary compact" onClick={()=>toggleCloudApproval(item)}>{item.approved?'Approved ✓':'Approve memory'}</button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+
         <section className="panel tableQrPanel" id="tableQrPanel">
           <div className="panelHead"><div><span>Table QR code</span><small>Guests scan at their table to open VoiceMento directly</small></div><QrCode size={22}/></div>
           <div className="tableQrLayout">
@@ -1345,7 +1397,7 @@ export default function VoiceMentoPhase1() {
               <label className="tableQrUrlLabel">Guest link<input readOnly value={tableGuestUrl} onFocus={e=>e.target.select()} onClick={e=>e.target.select()}/></label>
               {tableQrStatus && <p className="securityNote">{tableQrStatus}</p>}
               {tableQrError && <p className="recordError">{tableQrError}</p>}
-              <p className="tableQrWarning"><strong>Important:</strong> VoiceMento currently stores recordings on the phone that made them. QR guests must use “Share memory with host” after recording. Automatic delivery to this admin gallery requires shared cloud storage, which is not configured yet.</p>
+              <p className="tableQrWarning"><strong>{validCloudEvent(cloudConfig)?'Cloud-backed QR enabled:':'Local-only QR:'}</strong> {validCloudEvent(cloudConfig)?'Guests will save locally and upload automatically to the private cloud. Keep the connection available and ask guests to check for “Your memory is in the cloud” before leaving.':'Guests must use “Share memory with host” after recording until you connect Supabase above.'} The QR code can be reprinted after you connect the cloud.</p>
             </div>
           </div>
         </section>
