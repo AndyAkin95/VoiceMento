@@ -1263,18 +1263,26 @@ export default function VoiceMentoPhase1() {
           {boothStep === 'saved' && (
             <div className="savedMoment">
               <CheckCircle2 size={48}/>
-              <h2>{tableGuest?'Your memory is ready to send':'Added to their story.'}</h2>
+              <h2>{cloudSaveStatus==='uploaded'?'Your memory is in the cloud':tableGuest?'Your memory is ready to send':'Added to their story.'}</h2>
+              {cloudSaveStatus==='uploading' && <p>Uploading your memory to the private cloud. Keep this page open until it finishes.</p>}
+              {cloudSaveStatus==='uploaded' && <p>Your memory is saved on this device and uploaded to the event's private cloud gallery.</p>}
+              {cloudSaveStatus==='error' && (
+                <>
+                  <p className="recordError">{cloudSaveError}</p>
+                  <button className="recordBtn" onClick={retryCloudSave}><Upload size={18}/> Retry cloud upload</button>
+                </>
+              )}
               {tableGuest ? (
                 <>
-                  <p>Your memory is saved on this phone only. Use Share to send it to the event host; scanning the QR code does not automatically upload it.</p>
-                  <button className="recordBtn" onClick={shareGuestMemory}><Upload size={18}/> Share memory with host</button>
+                  {cloudSaveStatus==='idle' && <p>Your memory is saved on this phone only. Use Share to send it to the event host.</p>}
+                  {cloudSaveStatus!=='uploaded' && <button className="recordBtn" onClick={shareGuestMemory}><Upload size={18}/> Share memory with host</button>}
                   <button className="secondary" onClick={downloadGuestCopy}><Download size={18}/> Save a copy</button>
                   {guestShareStatus && <p className="securityNote">{guestShareStatus}</p>}
                   <button className="secondary" onClick={exitToEntrance}><RotateCcw size={18}/> Leave another memory</button>
                 </>
               ) : (
                 <>
-                  <p>{event.thankYouText}{guestName.trim()?' — '+guestName.trim():''} Returning to the booth in {resetCountdown}s.</p>
+                  <p>{event.thankYouText}{guestName.trim()?' — '+guestName.trim():''}{cloudSaveStatus==='idle'?' Returning to the booth in '+resetCountdown+'s.':''}</p>
                   <button className="secondary" onClick={exitToEntrance}><SkipForward size={18}/> Done</button>
                 </>
               )}
