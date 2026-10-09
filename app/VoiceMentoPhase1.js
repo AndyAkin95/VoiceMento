@@ -8,6 +8,7 @@ import {
   FileText, Image as ImageIcon, SwitchCamera, Eye, Save, SkipForward,
   Star, Upload, Volume2, Search, Check, MonitorPlay, ChevronRight
 } from 'lucide-react'
+import { EMPTY_CLOUD_CONFIG, validCloudEvent, cloudClient, uploadCloudMemory, fetchCloudMemories } from './voicementoCloud'
 
 const DEFAULT_EVENT = {
   title: 'Olivia & James',
@@ -197,7 +198,7 @@ function getBoothStyle(event) {
 }
 
 
-function makeTableGuestUrl(event) {
+function makeTableGuestUrl(event,cloud) {
   if (typeof window === 'undefined') return ''
   const url=new URL(window.location.href)
   url.search=''
@@ -211,6 +212,12 @@ function makeTableGuestUrl(event) {
   q.set('mo',(event.monogram||'').slice(0,24))
   q.set('f',['audio','video','photo','note'].map(k=>event.features?.[k]?'1':'0').join(''))
   q.set('frame',event.frame||'floral')
+  if(validCloudEvent(cloud)) {
+    q.set('cu',cloud.url)
+    q.set('ck',cloud.key)
+    q.set('ce',cloud.eventId)
+    q.set('cg',cloud.guestCode)
+  }
   return url.toString()
 }
 
@@ -236,6 +243,16 @@ function readTableGuestEvent() {
   return next
 }
 
+function readCloudFromGuestLink() {
+  const q=new URLSearchParams(window.location.search)
+  return {
+    url:q.get('cu')||'',
+    key:q.get('ck')||'',
+    eventId:q.get('ce')||'',
+    guestCode:q.get('cg')||''
+  }
+}
+
 function guestShareFiles(item) {
   if (!item) return []
   if (item.type==='note') return [new File([item.note||''],'VoiceMento-note-'+item.id+'.txt',{type:'text/plain'})]
@@ -257,6 +274,17 @@ export default function VoiceMentoPhase1() {
   const [tableQrStatus, setTableQrStatus] = useState('')
   const [lastGuestItem, setLastGuestItem] = useState(null)
   const [guestShareStatus, setGuestShareStatus] = useState('')
+  const [cloudConfig,setCloudConfig] = useState(EMPTY_CLOUD_CONFIG)
+  const [cloudEmail,setCloudEmail] = useState('')
+  const [cloudPassword,setCloudPassword] = useState('')
+  const [cloudUser,setCloudUser] = useState(null)
+  const [cloudStatus,setCloudStatus] = useState('')
+  const [cloudSaveStatus,setCloudSaveStatus] = useState('idle')
+  const [cloudSaveError,setCloudSaveError] = useState('')
+  const [cloudItems,setCloudItems] = useState([])
+  const [cloudGalleryStatus,setCloudGalleryStatus] = useState('')
+  const [cloudGalleryBusy,setCloudGalleryBusy] = useState(false)
+  const cloud=useMemo(()=>cloudClient(cloudConfig),[cloudConfig.url,cloudConfig.key])
   const [entering, setEntering] = useState(false)
   const [boothZoomStyle, setBoothZoomStyle] = useState(null)
   const [arrivalPhoneScale, setArrivalPhoneScale] = useState(null)
@@ -315,7 +343,12 @@ export default function VoiceMentoPhase1() {
       if (linkedGuest) {
         setTableGuest(true)
         setEvent(linkedGuest)
+        const config=readCloudFromGuestLink()
+        if(validCloudEvent(config))setCloudConfig(config)
         setView('booth')
+      }else{
+        const savedCloud=localStorage.getItem('voicemento_cloud_config')
+        if(savedCloud)setCloudConfig({...EMPTY_CLOUD_CONFIG,...JSON.parse(savedCloud)})
       }
       const savedEvent = localStorage.getItem('voicemento_event')
       if (!linkedGuest && savedEvent) {
@@ -339,7 +372,7 @@ export default function VoiceMentoPhase1() {
 
   useEffect(() => {
     if (view!=='admin'||tableGuest) return
-    const url=makeTableGuestUrl(event)
+    const url=makeTableGuestUrl(event,cloudConfig)
     setTableGuestUrl(url)
     setTableQrDataUrl('')
     setTableQrError('')
@@ -350,7 +383,18 @@ export default function VoiceMentoPhase1() {
     })).then(src=>{if(active)setTableQrDataUrl(src)})
       .catch(()=>{if(active)setTableQrError('QR preview unavailable. You can still copy the guest link.')})
     return ()=>{active=false}
-  },[view,tableGuest,event])
+  },[view,tableGuest,event,cloudConfig])
+
+  useEffect(()=>{
+    if(tableGuest||!cloud)return
+    let alive=true
+    cloud.auth.getUser().then(({data})=>{if(alive)setCloudUser(data.user||null)})
+      .catch(()=>{if(alive)setCloudUser(null)})
+    const {data:subscription}=cloud.auth.onAuthStateChange((_event,session)=>{
+      if(alive)setCloudUser(session?.user||null)
+    })
+    return ()=>{alive=false;subscription.subscription.unsubscribe()}
+  },[cloud,tableGuest])
 
   useEffect(() => {
     if (navigator.storage?.estimate) {
@@ -554,6 +598,8 @@ export default function VoiceMentoPhase1() {
     resetGuestSession()
     setLastGuestItem(null)
     setGuestShareStatus('')
+    setCloudSaveStatus('idle')
+    setCloudSaveError('')
     setView(tableGuest ? 'booth' : 'entrance')
   }
 
