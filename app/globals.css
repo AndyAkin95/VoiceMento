@@ -417,7 +417,7 @@ body{min-height:100%;background:#f5f0ea}
 /* Camera push: keep the telephone centered as the doors reveal it. */
 .weddingEntrance .phoneBooth{
   transform-origin:50% 50%;
-  transition:transform 2.24s cubic-bezier(.18,.70,.15,1) .22s,filter .8s ease;
+  transition:transform 2.85s cubic-bezier(.18,.70,.15,1) .3s,filter 1s ease;
 }
 .entering .boothStage .phoneBooth,
 .entering .boothStage:hover .phoneBooth{
@@ -427,7 +427,7 @@ body{min-height:100%;background:#f5f0ea}
   filter:drop-shadow(0 6px 12px rgba(48,34,24,.14))!important;
 }
 .entering .boothStage .boothDoor{
-  transition:transform 1.05s cubic-bezier(.18,.72,.18,1)!important;
+  transition:transform 1.35s cubic-bezier(.18,.72,.18,1)!important;
 }
 .entering .entranceCopy,.entering .adminLock,.entering .poweredBy{
   animation:fadeAway .9s .3s forwards;
@@ -435,7 +435,7 @@ body{min-height:100%;background:#f5f0ea}
 .entering .boothStage .tapLabel{opacity:0}
 @media(max-width:560px){
   .weddingEntrance .phoneBooth{
-    transition-duration:2.24s;
+    transition-duration:2.85s;
   }
 }
 
@@ -764,7 +764,7 @@ body{min-height:100%;background:#f5f0ea}
 }
 /* The final close-up is a view of the telephone, not a crop of the doorway. */
 .weddingEntrance .phoneBooth{
-  transition:transform 2.24s cubic-bezier(.18,.70,.15,1) .22s,filter .8s ease;
+  transition:transform 2.85s cubic-bezier(.18,.70,.15,1) .3s,filter 1s ease;
 }
 .entering .boothStage .phoneBooth,
 .entering .boothStage:hover .phoneBooth{
