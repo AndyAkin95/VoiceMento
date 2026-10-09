@@ -52,7 +52,7 @@ const DEFAULT_EVENT = {
 
 const DEFAULT_ADMIN_PIN = '8886'
 const RESET_SECONDS = 8
-const BOOTH_ENTRY_MS = 2750
+const BOOTH_ENTRY_MS = 3450
 
 const THEME_PRESETS = {
   romantic:{label:'Romantic Floral',accent:'#B58B6A',ambience:'rose',frame:'floral'},
