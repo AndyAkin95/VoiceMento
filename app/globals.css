@@ -414,6 +414,31 @@ body{min-height:100%;background:#f5f0ea}
   .openedBoothPhone .vintagePhone{--phone-scale:.73}
   .recordingPhoneWrap .vintagePhone{--phone-scale:.74}
 }
+/* Camera push: keep the telephone centered as the doors reveal it. */
+.weddingEntrance .phoneBooth{
+  transform-origin:50% 50%;
+  transition:transform 2.24s cubic-bezier(.18,.70,.15,1) .22s,filter .8s ease;
+}
+.entering .boothStage .phoneBooth,
+.entering .boothStage:hover .phoneBooth{
+  transform:
+    translate(var(--booth-pan-x,0px),var(--booth-pan-y,0px))
+    scale(calc(var(--booth-scale,1.12) * var(--booth-zoom-factor,2.15)))!important;
+  filter:drop-shadow(0 6px 12px rgba(48,34,24,.14))!important;
+}
+.entering .boothStage .boothDoor{
+  transition:transform 1.05s cubic-bezier(.18,.72,.18,1)!important;
+}
+.entering .entranceCopy,.entering .adminLock,.entering .poweredBy{
+  animation:fadeAway .9s .3s forwards;
+}
+.entering .boothStage .tapLabel{opacity:0}
+@media(max-width:560px){
+  .weddingEntrance .phoneBooth{
+    transition-duration:2.24s;
+  }
+}
+
 @media(prefers-reduced-motion:reduce){
   .weddingEntrance .phoneBooth,.entering .boothStage .phoneBooth{transition:none!important;transform:scale(var(--booth-scale,1.12))!important}
   .entering .boothStage .boothDoor{transition:none!important}
