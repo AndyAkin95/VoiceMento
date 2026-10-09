@@ -902,9 +902,51 @@ export default function VoiceMentoPhase1() {
     try {
       await dbPut(item)
       setMessages(prev => [hydrateItem(item),...prev])
+      setLastGuestItem(item)
+      setGuestShareStatus('')
       setBoothStep('saved')
     } catch {
       setRecordError('This message was captured but could not be saved on this device.')
+    }
+  }
+
+
+  function downloadGuestCopy() {
+    const files=guestShareFiles(lastGuestItem)
+    if (!files.length) return
+    for (const file of files) {
+      const objectUrl=URL.createObjectURL(file)
+      const link=document.createElement('a')
+      link.href=objectUrl
+      link.download=file.name
+      document.body.appendChild(link)
+      link.click()
+      link.remove()
+      setTimeout(()=>URL.revokeObjectURL(objectUrl),30000)
+    }
+    setGuestShareStatus('A copy was downloaded. Please send it to the event host.')
+  }
+
+  async function shareGuestMemory() {
+    const files=guestShareFiles(lastGuestItem)
+    if (!files.length) return
+    try {
+      if (navigator.share && (!navigator.canShare || navigator.canShare({files}))) {
+        await navigator.share({title:'VoiceMento memory',text:'A memory from '+event.title+' — '+lastGuestItem.guest,files})
+        setGuestShareStatus('Sent through your phone’s share menu. Confirm the host received it.')
+      } else downloadGuestCopy()
+    } catch (error) {
+      if (error?.name!=='AbortError') setGuestShareStatus('Sharing failed. Please download a copy instead.')
+    }
+  }
+
+  async function copyTableGuestLink() {
+    if (!tableGuestUrl) return
+    try {
+      await navigator.clipboard.writeText(tableGuestUrl)
+      setTableQrStatus('Link copied')
+    } catch {
+      setTableQrStatus('Select and copy the link below')
     }
   }
 
@@ -977,8 +1019,8 @@ export default function VoiceMentoPhase1() {
             <VintagePhone config={activePhone}/>
           </div>
         )}
-        <button className="guestExit" onClick={exitToEntrance}><ChevronLeft size={19}/> Exit booth</button>
-        <button className="adminLock boothAdmin" onClick={openAdmin}><LockKeyhole size={16}/> Admin</button>
+        <button className="guestExit" onClick={exitToEntrance}><ChevronLeft size={19}/> {tableGuest?'Start over':'Exit booth'}</button>
+        {!tableGuest && <button className="adminLock boothAdmin" onClick={openAdmin}><LockKeyhole size={16}/> Admin</button>}
 
         <section className="phaseCard">
           <div className="cardMonogram customCardMonogram">{event.logoData?<img src={event.logoData} alt="Event logo"/>:event.monogram}</div>
@@ -1077,9 +1119,21 @@ export default function VoiceMentoPhase1() {
           {boothStep === 'saved' && (
             <div className="savedMoment">
               <CheckCircle2 size={48}/>
-              <h2>Added to their story.</h2>
-              <p>{event.thankYouText}{guestName.trim()?' — '+guestName.trim():''} Returning to the booth in {resetCountdown}s.</p>
-              <button className="secondary" onClick={exitToEntrance}><SkipForward size={18}/> Done</button>
+              <h2>{tableGuest?'Your memory is ready to send':'Added to their story.'}</h2>
+              {tableGuest ? (
+                <>
+                  <p>Your memory is saved on this phone only. Use Share to send it to the event host; scanning the QR code does not automatically upload it.</p>
+                  <button className="recordBtn" onClick={shareGuestMemory}><Upload size={18}/> Share memory with host</button>
+                  <button className="secondary" onClick={downloadGuestCopy}><Download size={18}/> Save a copy</button>
+                  {guestShareStatus && <p className="securityNote">{guestShareStatus}</p>}
+                  <button className="secondary" onClick={exitToEntrance}><RotateCcw size={18}/> Leave another memory</button>
+                </>
+              ) : (
+                <>
+                  <p>{event.thankYouText}{guestName.trim()?' — '+guestName.trim():''} Returning to the booth in {resetCountdown}s.</p>
+                  <button className="secondary" onClick={exitToEntrance}><SkipForward size={18}/> Done</button>
+                </>
+              )}
             </div>
           )}
 
