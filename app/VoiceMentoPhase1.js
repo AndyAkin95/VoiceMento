@@ -52,6 +52,7 @@ const DEFAULT_EVENT = {
 
 const DEFAULT_ADMIN_PIN = '8886'
 const RESET_SECONDS = 8
+const BOOTH_ENTRY_MS = 2750
 
 const THEME_PRESETS = {
   romantic:{label:'Romantic Floral',accent:'#B58B6A',ambience:'rose',frame:'floral'},
@@ -197,6 +198,7 @@ function getBoothStyle(event) {
 export default function VoiceMentoPhase1() {
   const [view, setView] = useState('entrance')
   const [entering, setEntering] = useState(false)
+  const [boothZoomStyle, setBoothZoomStyle] = useState(null)
   const [event, setEvent] = useState(DEFAULT_EVENT)
   const [messages, setMessages] = useState([])
   const [guestName, setGuestName] = useState('')
@@ -235,6 +237,11 @@ export default function VoiceMentoPhase1() {
   const videoPreviewRef = useRef(null)
   const startedAtRef = useRef(0)
   const attractRef = useRef(null)
+  const entranceTimerRef = useRef(null)
+
+  useEffect(() => () => {
+    if (entranceTimerRef.current) clearTimeout(entranceTimerRef.current)
+  }, [])
 
   useEffect(() => {
     if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js').catch(() => {})
@@ -446,19 +453,62 @@ export default function VoiceMentoPhase1() {
   }
 
   function exitToEntrance() {
+    if (entranceTimerRef.current) clearTimeout(entranceTimerRef.current)
+    entranceTimerRef.current = null
+    setEntering(false)
+    setBoothZoomStyle(null)
     resetGuestSession()
     setView('entrance')
   }
 
-  function enterBooth() {
+  function enterBooth(e) {
     if (entering) return
-    setEntering(true)
+
     const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
-    setTimeout(() => {
+    if (reduceMotion) {
+      resetGuestSession()
+      setView('booth')
+      return
+    }
+
+    // Align the zoom with the telephone, not the booth's outer frame.
+    // Measuring the rendered positions handles different screen sizes,
+    // booth presets and the guest's chosen booth size.
+    const booth = e.currentTarget.querySelector('.phoneBooth')
+    const phone = booth?.querySelector('.boothInterior .vintagePhone')
+    let nextZoom = null
+
+    if (booth && phone) {
+      const boothRect = booth.getBoundingClientRect()
+      const phoneRect = phone.getBoundingClientRect()
+      const phoneCenterX = phoneRect.left + phoneRect.width / 2
+      const phoneCenterY = phoneRect.top + phoneRect.height / 2
+      const boothCenterX = boothRect.left + boothRect.width / 2
+      const boothCenterY = boothRect.top + boothRect.height / 2
+
+      // The previous 5.4x zoom made the booth excessively large and cropped it.
+      // Limit the final telephone to a comfortable, fully visible size.
+      const phoneTargetWidth = Math.min(194, window.innerWidth * 0.46)
+      const zoomFactor = Math.max(1, Math.min(2.6, phoneTargetWidth / Math.max(1, phoneRect.width)))
+      const panX = window.innerWidth / 2 - (boothCenterX + (phoneCenterX - boothCenterX) * zoomFactor)
+      const panY = window.innerHeight / 2 - (boothCenterY + (phoneCenterY - boothCenterY) * zoomFactor)
+
+      nextZoom = {
+        '--booth-zoom-factor': zoomFactor,
+        '--booth-pan-x': panX + 'px',
+        '--booth-pan-y': panY + 'px'
+      }
+    }
+
+    setBoothZoomStyle(nextZoom)
+    setEntering(true)
+    entranceTimerRef.current = setTimeout(() => {
       resetGuestSession()
       setView('booth')
       setEntering(false)
-    }, reduceMotion ? 120 : 1100)
+      setBoothZoomStyle(null)
+      entranceTimerRef.current = null
+    }, BOOTH_ENTRY_MS)
   }
 
   async function runCountdown() {
@@ -781,7 +831,7 @@ export default function VoiceMentoPhase1() {
           {event.hashtag&&<p className="eventHashtag">{event.hashtag}</p>}
           {event.privacy==='guests'&&messages.some(m=>m.approved)&&<button className="guestGalleryButton" onClick={()=>setView('guestGallery')}><Images size={17}/> View event gallery</button>}
         </section>
-        <button className="boothStage" onClick={enterBooth} aria-label="Enter VoiceMento">
+        <button className="boothStage" onClick={enterBooth} style={boothZoomStyle||undefined} aria-label="Enter VoiceMento">
           <span className="floorShadow"/><span className="boothGlow"/>
           <BoothModel event={event} phone={activePhone}/>
           <span className="tapLabel">{entering?'Come on in…':'Tap the booth to enter'}</span>
@@ -1258,7 +1308,6 @@ function BoothModel({event,phone}) {
       className={'phoneBooth boothStyle-'+style+(event.boothCustom?' boothCustom':'')+' boothDoors-'+booth.door}
       style={{
         '--booth-scale':scale,
-        '--booth-zoom':scale*5.4,
         '--booth-panel':booth.panel,
         '--booth-metal':booth.trim,
         '--booth-inside':booth.interior
