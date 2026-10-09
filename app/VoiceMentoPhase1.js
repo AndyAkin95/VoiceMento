@@ -199,6 +199,7 @@ export default function VoiceMentoPhase1() {
   const [view, setView] = useState('entrance')
   const [entering, setEntering] = useState(false)
   const [boothZoomStyle, setBoothZoomStyle] = useState(null)
+  const [arrivalPhoneScale, setArrivalPhoneScale] = useState(null)
   const [event, setEvent] = useState(DEFAULT_EVENT)
   const [messages, setMessages] = useState([])
   const [guestName, setGuestName] = useState('')
@@ -238,9 +239,11 @@ export default function VoiceMentoPhase1() {
   const startedAtRef = useRef(0)
   const attractRef = useRef(null)
   const entranceTimerRef = useRef(null)
+  const arrivalTimerRef = useRef(null)
 
   useEffect(() => () => {
     if (entranceTimerRef.current) clearTimeout(entranceTimerRef.current)
+    if (arrivalTimerRef.current) clearTimeout(arrivalTimerRef.current)
   }, [])
 
   useEffect(() => {
@@ -454,9 +457,12 @@ export default function VoiceMentoPhase1() {
 
   function exitToEntrance() {
     if (entranceTimerRef.current) clearTimeout(entranceTimerRef.current)
+    if (arrivalTimerRef.current) clearTimeout(arrivalTimerRef.current)
     entranceTimerRef.current = null
+    arrivalTimerRef.current = null
     setEntering(false)
     setBoothZoomStyle(null)
+    setArrivalPhoneScale(null)
     resetGuestSession()
     setView('entrance')
   }
@@ -467,13 +473,14 @@ export default function VoiceMentoPhase1() {
     const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
     if (reduceMotion) {
       resetGuestSession()
+      setArrivalPhoneScale(null)
       setView('booth')
       return
     }
 
-    // Align the zoom with the telephone, not the booth's outer frame.
-    // Measuring the rendered positions handles different screen sizes,
-    // booth presets and the guest's chosen booth size.
+    // Start with a small, realistically sized telephone in the booth,
+    // then move straight toward it until it takes up most of the viewport.
+    // Actual measurements keep the phone centered across booth sizes and devices.
     const booth = e.currentTarget.querySelector('.phoneBooth')
     const phone = booth?.querySelector('.boothInterior .vintagePhone')
     let nextZoom = null
@@ -486,12 +493,19 @@ export default function VoiceMentoPhase1() {
       const boothCenterX = boothRect.left + boothRect.width / 2
       const boothCenterY = boothRect.top + boothRect.height / 2
 
-      // The previous 5.4x zoom made the booth excessively large and cropped it.
-      // Limit the final telephone to a comfortable, fully visible size.
-      const phoneTargetWidth = Math.min(194, window.innerWidth * 0.46)
-      const zoomFactor = Math.max(1, Math.min(2.6, phoneTargetWidth / Math.max(1, phoneRect.width)))
-      const panX = window.innerWidth / 2 - (boothCenterX + (phoneCenterX - boothCenterX) * zoomFactor)
-      const panY = window.innerHeight / 2 - (boothCenterY + (phoneCenterY - boothCenterY) * zoomFactor)
+      // Fill the available width on a portrait phone, or about 80% of the
+      // screen height on wide/landscape screens without cutting off the receiver.
+      const viewportWidth = window.innerWidth
+      const viewportHeight = window.innerHeight
+      const phoneAspect = phoneRect.width / Math.max(1, phoneRect.height)
+      const phoneTargetWidth = Math.min(
+        viewportWidth * 0.92,
+        viewportHeight * 0.80 * phoneAspect
+      )
+      const zoomFactor = Math.max(1, Math.min(14, phoneTargetWidth / Math.max(1, phoneRect.width)))
+      const panX = viewportWidth / 2 - (boothCenterX + (phoneCenterX - boothCenterX) * zoomFactor)
+      const panY = viewportHeight / 2 - (boothCenterY + (phoneCenterY - boothCenterY) * zoomFactor)
+      setArrivalPhoneScale(Math.min(14, phoneTargetWidth / 190))
 
       nextZoom = {
         '--booth-zoom-factor': zoomFactor,
@@ -508,6 +522,10 @@ export default function VoiceMentoPhase1() {
       setEntering(false)
       setBoothZoomStyle(null)
       entranceTimerRef.current = null
+      arrivalTimerRef.current = setTimeout(() => {
+        setArrivalPhoneScale(null)
+        arrivalTimerRef.current = null
+      }, 950)
     }, BOOTH_ENTRY_MS)
   }
 
@@ -865,9 +883,17 @@ export default function VoiceMentoPhase1() {
 
   if (view === 'booth') {
     return (
-      <main className={'boothExperience theme-' + event.theme + ' ambience-' + event.ambience + ' intensity-' + event.ambienceIntensity} style={{'--accent':event.accent,...(event.backgroundData?{backgroundImage:'linear-gradient(rgba(250,246,241,.82),rgba(240,230,221,.9)),url("'+event.backgroundData+'")',backgroundSize:'cover',backgroundPosition:'center'}:{})}}>
+      <main className={'boothExperience theme-' + event.theme + ' ambience-' + event.ambience + ' intensity-' + event.ambienceIntensity + (arrivalPhoneScale ? ' boothJustArrived' : '')} style={{'--accent':event.accent,...(event.backgroundData?{backgroundImage:'linear-gradient(rgba(250,246,241,.82),rgba(240,230,221,.9)),url("'+event.backgroundData+'")',backgroundSize:'cover',backgroundPosition:'center'}:{})}}>
         <Atmosphere type={event.ambience} intensity={event.ambienceIntensity} subtle/>
         <div className="floralCorner floralTop"/><div className="floralCorner floralBottom"/>
+        {arrivalPhoneScale && (
+          <div className="boothArrivalOverlay" aria-hidden="true" style={{
+            '--arrival-phone-scale':arrivalPhoneScale,
+            '--booth-inside':(event.booth||DEFAULT_EVENT.booth).interior
+          }}>
+            <VintagePhone config={activePhone}/>
+          </div>
+        )}
         <button className="guestExit" onClick={exitToEntrance}><ChevronLeft size={19}/> Exit booth</button>
         <button className="adminLock boothAdmin" onClick={openAdmin}><LockKeyhole size={16}/> Admin</button>
 
