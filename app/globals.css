@@ -904,3 +904,45 @@ body{min-height:100%;background:#f5f0ea}
   .tableQrImageBox{width:2.25in!important}
   .tableQrPrintCard h2{font-size:26pt!important}
 }
+
+/* Secure cloud-backup setup and private host gallery. */
+.cloudPanel{scroll-margin-top:24px}
+.cloudIntro{font-size:14px;color:#71635b;line-height:1.65;margin:14px 0 22px;max-width:850px}
+.cloudSettingsGrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+.cloudSettingsGrid label,.cloudLogin label{display:block;font-size:12px;color:#6f6056;font-weight:700}
+.cloudSettingsGrid input,.cloudLogin input{
+  display:block;width:100%;padding:12px 14px;margin-top:7px;
+  background:#fffaf5;border:1px solid #d9cbbf;border-radius:10px;
+  color:#382b24;font-size:13px;min-width:0;
+}
+.cloudLogin{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;align-items:end;margin:20px 0}
+.cloudLogin>button{grid-column:1/-1;justify-self:start}
+.cloudSmallInfo{font-size:12px;color:#897568;line-height:1.6;margin:13px 0}
+.cloudSmallInfo a{color:#76523a;font-weight:700}
+.cloudLogin .cloudSmallInfo{grid-column:1/-1;margin:0}
+.cloudSignedIn{display:flex;align-items:center;flex-wrap:wrap;gap:9px;color:#506b50;font-size:13px;line-height:1.6;margin:14px 0}
+.cloudSignedIn .secondary{margin-left:9px}
+.cloudCreateEvent{margin:12px 0}
+.cloudEventIds{margin:20px 0 15px}
+.cloudEventIds input{font-size:11px;letter-spacing:.02em}
+.cloudFeedback{font-size:13px;color:#4c4b40;background:#f6f0e5;border-radius:9px;padding:10px 13px}
+.cloudStorageStatus{font-size:12px;font-weight:750;color:#695440;background:#faf4eb;border:1px solid #ecdfd1;padding:12px 14px;border-radius:10px}
+.cloudGallery{margin-top:21px;padding-top:20px;border-top:1px solid #e9ded5}
+.cloudGalleryHeader{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:14px}
+.cloudGalleryHeader h3{font:400 23px Georgia,serif;color:#362922;margin:0}
+.cloudGalleryHeader button{display:flex;align-items:center;gap:8px}
+.cloudMemoryItem{margin:12px 0;padding:15px;border:1px solid #e8dacd;border-radius:12px;background:#fffcf8;display:grid;gap:10px}
+.cloudMemoryItem>div:first-child{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:6px}
+.cloudMemoryItem strong{font-size:15px;color:#3c2e25}
+.cloudMemoryItem span{font-size:12px;color:#928277}
+.cloudMemoryItem audio{width:100%;max-width:420px}
+.cloudMemoryItem video{width:min(100%,400px);max-height:280px;border-radius:12px}
+.cloudMemoryItem img{width:min(100%,350px);max-height:280px;object-fit:contain;border-radius:12px}
+.cloudMemoryItem p{font-size:14px;line-height:1.5;color:#594c43}
+.cloudMemoryActions{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.cloudMemoryActions a{font-size:13px;color:#76523a;text-decoration:underline}
+.cloudMemoryActions button{padding:8px 12px;font-size:12px}
+@media(max-width:760px){
+  .cloudSettingsGrid,.cloudLogin{grid-template-columns:1fr}
+  .cloudGalleryHeader{align-items:flex-start}
+}
