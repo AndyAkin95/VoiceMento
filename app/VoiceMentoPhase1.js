@@ -52,6 +52,7 @@ const DEFAULT_EVENT = {
 
 const DEFAULT_ADMIN_PIN = '8886'
 const RESET_SECONDS = 8
+const MAX_RECORD_SECONDS = 180
 const BOOTH_ENTRY_MS = 3450
 
 const THEME_PRESETS = {
@@ -291,6 +292,7 @@ export default function VoiceMentoPhase1() {
   const [pinSaved, setPinSaved] = useState(false)
 
   const timerRef = useRef(null)
+  const recordLimitRef = useRef(null)
   const mediaRecorderRef = useRef(null)
   const chunksRef = useRef([])
   const streamRef = useRef(null)
@@ -303,6 +305,7 @@ export default function VoiceMentoPhase1() {
   useEffect(() => () => {
     if (entranceTimerRef.current) clearTimeout(entranceTimerRef.current)
     if (arrivalTimerRef.current) clearTimeout(arrivalTimerRef.current)
+    if (recordLimitRef.current) clearTimeout(recordLimitRef.current)
   }, [])
 
   useEffect(() => {
@@ -356,7 +359,11 @@ export default function VoiceMentoPhase1() {
   }, [messages])
 
   useEffect(() => {
-    if (recording) timerRef.current = setInterval(() => setSeconds(s => s + 1), 1000)
+    if (recording) timerRef.current = setInterval(() => {
+      const elapsed=Math.floor((Date.now()-startedAtRef.current)/1000)
+      setSeconds(Math.min(MAX_RECORD_SECONDS,elapsed))
+      if (elapsed >= MAX_RECORD_SECONDS) finishMedia()
+    }, 250)
     else if (timerRef.current) clearInterval(timerRef.current)
     return () => timerRef.current && clearInterval(timerRef.current)
   }, [recording])
@@ -631,7 +638,7 @@ export default function VoiceMentoPhase1() {
         throw new Error('Recording is not supported on this device.')
       }
       const constraints = type === 'video'
-        ? { audio:true, video:{ facingMode:'user', width:{ideal:1280}, height:{ideal:720} } }
+        ? { audio:true, video:{ facingMode:'user', width:{ideal:854}, height:{ideal:480} } }
         : { audio:true }
       const stream = await navigator.mediaDevices.getUserMedia(constraints)
       streamRef.current = stream
@@ -642,18 +649,24 @@ export default function VoiceMentoPhase1() {
         await runCountdown()
       }
       const mime = bestMime(type)
-      const recorder = mime ? new MediaRecorder(stream,{mimeType:mime}) : new MediaRecorder(stream)
+      const options={audioBitsPerSecond:64000,...(type==='video'?{videoBitsPerSecond:850000}:{})}
+      if (mime) options.mimeType=mime
+      const recorder=new MediaRecorder(stream,options)
       mediaRecorderRef.current = recorder
       chunksRef.current = []
       recorder.ondataavailable = e => { if (e.data && e.data.size) chunksRef.current.push(e.data) }
       recorder.onerror = () => {
+        if (recordLimitRef.current) clearTimeout(recordLimitRef.current)
+        recordLimitRef.current=null
         setRecordError('The recording stopped unexpectedly. Please try again.')
         setRecording(false)
         setPreparing(false)
         stopStream(streamRef, videoPreviewRef)
       }
       recorder.onstop = () => {
-        const duration = Math.max(1,Math.round((Date.now()-startedAtRef.current)/1000))
+        if (recordLimitRef.current) clearTimeout(recordLimitRef.current)
+        recordLimitRef.current=null
+        const duration = Math.max(1,Math.min(MAX_RECORD_SECONDS,Math.round((Date.now()-startedAtRef.current)/1000)))
         const blob = new Blob(chunksRef.current,{type:recorder.mimeType || (type==='video'?'video/mp4':'audio/mp4')})
         stopStream(streamRef, videoPreviewRef)
         if (!blob.size) {
@@ -672,6 +685,7 @@ export default function VoiceMentoPhase1() {
       }
       startedAtRef.current = Date.now()
       recorder.start(250)
+      recordLimitRef.current=setTimeout(()=>finishMedia(),MAX_RECORD_SECONDS*1000)
       setRecording(true)
       setPreparing(false)
     } catch (err) {
@@ -685,6 +699,9 @@ export default function VoiceMentoPhase1() {
   }
 
   function finishMedia() {
+    if (recordLimitRef.current) clearTimeout(recordLimitRef.current)
+    recordLimitRef.current=null
+    setSeconds(Math.min(MAX_RECORD_SECONDS,Math.floor((Date.now()-startedAtRef.current)/1000)))
     setRecording(false)
     const recorder = mediaRecorderRef.current
     if (recorder && recorder.state !== 'inactive') recorder.stop()
@@ -1055,7 +1072,8 @@ export default function VoiceMentoPhase1() {
               {mode==='audio' && <div className="recordingPhoneWrap"><VintagePhone active config={activePhone}/></div>}
               {mode==='video' && <div className="capturePreview"><video ref={videoPreviewRef} muted playsInline/></div>}
               {countdown>0 && <div className="bigCountdown">{countdown}</div>}
-              <div className={recording?'timer recording':'timer'}>{String(Math.floor(seconds/60)).padStart(2,'0')}:{String(seconds%60).padStart(2,'0')}</div>
+              <div className={recording?'timer recording':'timer'}>{String(Math.floor(seconds/60)).padStart(2,'0')}:{String(seconds%60).padStart(2,'0')} / 03:00</div>
+              <p className="helper">Maximum recording length: 3 minutes. Recording stops automatically.</p>
               {preparing && <p className="helper">Preparing camera…</p>}
               {recording && <button className="stopBtn" onClick={finishMedia}><Square size={20} fill="currentColor"/> Finish message</button>}
               {recordError && <p className="recordError">{recordError}</p>}
