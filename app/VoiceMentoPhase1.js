@@ -705,7 +705,12 @@ export default function VoiceMentoPhase1() {
       const mime = bestMime(type)
       const options={audioBitsPerSecond:64000,...(type==='video'?{videoBitsPerSecond:850000}:{})}
       if (mime) options.mimeType=mime
-      const recorder=new MediaRecorder(stream,options)
+      let recorder
+      try {
+        recorder=new MediaRecorder(stream,options)
+      } catch {
+        recorder=mime?new MediaRecorder(stream,{mimeType:mime}):new MediaRecorder(stream)
+      }
       mediaRecorderRef.current = recorder
       chunksRef.current = []
       recorder.ondataavailable = e => { if (e.data && e.data.size) chunksRef.current.push(e.data) }
@@ -1170,7 +1175,7 @@ export default function VoiceMentoPhase1() {
             <VintagePhone config={activePhone}/>
           </div>
         )}
-        <button className="guestExit" onClick={exitToEntrance}><ChevronLeft size={19}/> {tableGuest?'Start over':'Exit booth'}</button>
+        <button className="guestExit" disabled={cloudSaveStatus==='uploading'} onClick={exitToEntrance}><ChevronLeft size={19}/> {tableGuest?'Start over':'Exit booth'}</button>
         {!tableGuest && <button className="adminLock boothAdmin" onClick={openAdmin}><LockKeyhole size={16}/> Admin</button>}
 
         <section className="phaseCard">
@@ -1283,7 +1288,7 @@ export default function VoiceMentoPhase1() {
               {tableGuest ? (
                 <>
                   {cloudSaveStatus==='idle' && <p>Your memory is saved on this phone only. Use Share to send it to the event host.</p>}
-                  {cloudSaveStatus!=='uploaded' && <button className="recordBtn" onClick={shareGuestMemory}><Upload size={18}/> Share memory with host</button>}
+                  {(cloudSaveStatus==='idle'||cloudSaveStatus==='error') && <button className="recordBtn" onClick={shareGuestMemory}><Upload size={18}/> Share memory with host</button>}
                   <button className="secondary" onClick={downloadGuestCopy}><Download size={18}/> Save a copy</button>
                   {guestShareStatus && <p className="securityNote">{guestShareStatus}</p>}
                   <button className="secondary" onClick={exitToEntrance}><RotateCcw size={18}/> Leave another memory</button>
