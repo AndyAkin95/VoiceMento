@@ -968,11 +968,91 @@ export default function VoiceMentoPhase1() {
       setLastGuestItem(item)
       setGuestShareStatus('')
       setBoothStep('saved')
+      if(validCloudEvent(cloudConfig)) {
+        await uploadSavedMemory(item)
+      }else setCloudSaveStatus('idle')
     } catch {
       setRecordError('This message was captured but could not be saved on this device.')
     }
   }
 
+
+
+  function updateCloudConfig(field,value) {
+    setCloudConfig(previous=>{
+      const next={...previous,[field]:value.trim()}
+      localStorage.setItem('voicemento_cloud_config',JSON.stringify(next))
+      return next
+    })
+    setCloudStatus('')
+  }
+
+  async function signInCloud() {
+    if(!cloud) {setCloudStatus('Enter your project URL and publishable key first.');return}
+    setCloudStatus('Signing in…')
+    try {
+      const {data,error}=await cloud.auth.signInWithPassword({email:cloudEmail.trim(),password:cloudPassword})
+      if(error) throw error
+      setCloudUser(data.user||null)
+      setCloudPassword('')
+      setCloudStatus('Cloud account connected.')
+    }catch(error){setCloudStatus(error.message||'Could not sign in.')}
+  }
+
+  async function createCloudEvent() {
+    if(!cloud||!cloudUser)return setCloudStatus('Sign in to your cloud account first.')
+    setCloudStatus('Creating a private cloud event…')
+    try {
+      const {data,error}=await cloud.from('voicemento_events')
+        .insert({title:(event.title||'VoiceMento').slice(0,120)})
+        .select('id,guest_code').single()
+      if(error)throw error
+      const next={...cloudConfig,eventId:data.id,guestCode:data.guest_code}
+      setCloudConfig(next)
+      localStorage.setItem('voicemento_cloud_config',JSON.stringify(next))
+      setCloudStatus('Cloud event ready. Download a NEW QR card so guests can upload directly.')
+      setCloudItems([])
+    }catch(error){setCloudStatus(error.message||'Could not create an event. Run the SQL setup first.')}
+  }
+
+  async function refreshCloudGallery() {
+    if(!cloud||!cloudUser||!validCloudEvent(cloudConfig))return setCloudGalleryStatus('Connect and sign in to your cloud event first.')
+    setCloudGalleryBusy(true)
+    setCloudGalleryStatus('Loading your private cloud gallery…')
+    try{
+      const list=await fetchCloudMemories(cloud,cloudConfig)
+      setCloudItems(list)
+      setCloudGalleryStatus(list.length+' cloud '+(list.length===1?'memory':'memories')+' loaded.')
+    }catch(error){setCloudGalleryStatus(error.message||'Could not load the cloud gallery.')}
+    finally{setCloudGalleryBusy(false)}
+  }
+
+  async function toggleCloudApproval(item) {
+    if(!cloud||!cloudUser)return
+    const {error}=await cloud.from('voicemento_memories')
+      .update({approved:!item.approved}).eq('id',item.id).eq('event_id',cloudConfig.eventId)
+    if(error){setCloudGalleryStatus(error.message);return}
+    setCloudItems(old=>old.map(x=>x.id===item.id?{...x,approved:!item.approved}:x))
+  }
+
+  async function uploadSavedMemory(item) {
+    if(!validCloudEvent(cloudConfig)||!cloud)return false
+    setCloudSaveStatus('uploading')
+    setCloudSaveError('')
+    try {
+      await uploadCloudMemory(cloud,cloudConfig,item)
+      setCloudSaveStatus('uploaded')
+      return true
+    } catch (error) {
+      setCloudSaveStatus('error')
+      setCloudSaveError((error?.message||'Cloud upload failed')+' Your on-device copy was preserved.')
+      return false
+    }
+  }
+
+  async function retryCloudSave() {
+    if(lastGuestItem)await uploadSavedMemory(lastGuestItem)
+  }
 
   function downloadGuestCopy() {
     const files=guestShareFiles(lastGuestItem)
