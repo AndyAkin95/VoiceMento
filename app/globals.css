@@ -739,3 +739,92 @@ body{min-height:100%;background:#f5f0ea}
     --phone-scale:.60;
   }
 }
+
+/* V2 phone perspective: life-size inside the booth, screen-filling on entry. */
+.boothAlcoveMini .boothPhoneMount{
+  width:43%;
+  height:35%;
+  top:23%;
+}
+.boothAlcoveMini .boothPhoneShelf{
+  width:58%;
+  top:57%;
+  height:6%;
+}
+.boothAlcoveMini .boothPhoneWrap{top:57%}
+.boothAlcoveMini .boothShelfBracket{top:62%;height:10%}
+.boothAlcoveMini .boothShelfBracketLeft{left:31%}
+.boothAlcoveMini .boothShelfBracketRight{right:31%}
+.boothAlcoveMini .boothPhoneWrap .vintagePhone.compact{
+  --phone-scale:.36;
+  filter:drop-shadow(0 4px 5px rgba(24,15,10,.35));
+}
+.boothStagePreview .boothAlcoveMini .boothPhoneWrap .vintagePhone.compact{
+  --phone-scale:.36;
+}
+/* The final close-up is a view of the telephone, not a crop of the doorway. */
+.weddingEntrance .phoneBooth{
+  transition:transform 2.24s cubic-bezier(.18,.70,.15,1) .22s,filter .8s ease;
+}
+.entering .boothStage .phoneBooth,
+.entering .boothStage:hover .phoneBooth{
+  transform:
+    translate(var(--booth-pan-x,0px),var(--booth-pan-y,0px))
+    scale(calc(var(--booth-scale,1.12) * var(--booth-zoom-factor,1)))!important;
+  filter:none!important;
+}
+.boothArrivalOverlay{
+  position:fixed;
+  inset:0;
+  display:grid;
+  place-items:center;
+  z-index:22;
+  pointer-events:none;
+  overflow:hidden;
+  isolation:isolate;
+}
+.boothArrivalOverlay::before{
+  content:"";
+  position:absolute;
+  inset:0;
+  background:radial-gradient(ellipse at center,
+    color-mix(in srgb,var(--booth-inside,#584639) 73%,#e5d1b3),
+    var(--booth-inside,#584639) 110%);
+  animation:boothArrivalVeil .95s ease-out forwards;
+}
+.boothArrivalOverlay>.vintagePhone{
+  z-index:1;
+  flex:none;
+  margin:0;
+  width:190px;
+  height:184px;
+  transform-origin:center center;
+  animation:boothPhoneSettle .95s cubic-bezier(.2,.7,.18,1) forwards;
+}
+.boothJustArrived .phaseCard{
+  animation:boothGuestReveal .95s ease-out both;
+}
+.boothJustArrived .guestExit,
+.boothJustArrived .boothAdmin{
+  animation:boothGuestReveal .95s ease-out both;
+}
+@keyframes boothPhoneSettle{
+  0%{transform:scale(var(--arrival-phone-scale,3));opacity:1}
+  44%{opacity:1}
+  100%{transform:scale(.8);opacity:0}
+}
+@keyframes boothArrivalVeil{
+  0%{opacity:1}
+  42%{opacity:.85}
+  100%{opacity:0}
+}
+@keyframes boothGuestReveal{
+  0%,24%{opacity:0;transform:translateY(10px)}
+  100%{opacity:1;transform:translateY(0)}
+}
+@media(prefers-reduced-motion:reduce){
+  .boothArrivalOverlay{display:none}
+  .boothJustArrived .phaseCard,
+  .boothJustArrived .guestExit,
+  .boothJustArrived .boothAdmin{animation:none}
+}
