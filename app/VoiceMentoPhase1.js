@@ -1157,7 +1157,7 @@ export default function VoiceMentoPhase1() {
         <nav>
           <button className="nav active" onClick={()=>window.scrollTo({top:0,behavior:'smooth'})}><CalendarDays size={20}/> Event</button>
           <button className="nav" onClick={openGallery}><Images size={20}/> Gallery</button>
-          <button className="nav"><Users size={20}/> Guests</button>
+          <button className="nav" onClick={()=>document.getElementById('tableQrPanel')?.scrollIntoView({behavior:'smooth',block:'start'})}><Users size={20}/> Guests & QR</button>
           <button className="nav"><Settings size={20}/> Settings</button>
         </nav>
         <button className="lockOut" onClick={()=>setView('entrance')}><LogOut size={18}/> Lock admin</button>
@@ -1168,6 +1168,35 @@ export default function VoiceMentoPhase1() {
           <div><div className="eyebrow">EVENT DASHBOARD</div><h1>{event.title}</h1><p>{event.subtitle}</p></div>
           <button className="launch" onClick={()=>setView('entrance')}><Play size={18} fill="currentColor"/> Preview guest experience</button>
         </header>
+
+        <section className="panel tableQrPanel" id="tableQrPanel">
+          <div className="panelHead"><div><span>Table QR code</span><small>Guests scan at their table to open VoiceMento directly</small></div><QrCode size={22}/></div>
+          <div className="tableQrLayout">
+            <div className="tableQrPrintCard" id="tableQrPrintCard" style={{'--qr-accent':event.accent}}>
+              <p className="tableQrEyebrow">A MEMORY TO KEEP</p>
+              <h2>{event.title}</h2>
+              <p className="tableQrSubtitle">{event.subtitle}</p>
+              <div className="tableQrImageBox">{tableQrDataUrl?<img src={tableQrDataUrl} alt="QR code linking to the guest recording page"/>:<QrCode size={95} strokeWidth={1}/>}</div>
+              <p className="tableQrAction">SCAN TO LEAVE A MEMORY</p>
+              <p className="tableQrFooter">Voice · Video · Photos · Notes</p>
+              <p className="tableQrBrand">VOICEMENTO</p>
+            </div>
+            <div className="tableQrControls">
+              <h3>Place one at every table</h3>
+              <p>Guests scan with their phone's camera and go straight to the recording screen—no booth animation required.</p>
+              <div className="tableQrButtons">
+                <button className="secondary" onClick={copyTableGuestLink}><QrCode size={17}/> Copy guest link</button>
+                {tableQrDataUrl && <a className="secondary" href={tableQrDataUrl} download="VoiceMento-table-QR.png"><Download size={17}/> Download QR</a>}
+                <button className="secondary" onClick={()=>window.print()} disabled={!tableQrDataUrl}><Download size={17}/> Print table card</button>
+                {tableGuestUrl && <a className="secondary" href={tableGuestUrl} target="_blank" rel="noopener noreferrer"><Eye size={17}/> Test guest link</a>}
+              </div>
+              <label className="tableQrUrlLabel">Guest link<input readOnly value={tableGuestUrl} onFocus={e=>e.target.select()} onClick={e=>e.target.select()}/></label>
+              {tableQrStatus && <p className="securityNote">{tableQrStatus}</p>}
+              {tableQrError && <p className="recordError">{tableQrError}</p>}
+              <p className="tableQrWarning"><strong>Important:</strong> VoiceMento currently stores recordings on the phone that made them. QR guests must use “Share memory with host” after recording. Automatic delivery to this admin gallery requires shared cloud storage, which is not configured yet.</p>
+            </div>
+          </div>
+        </section>
 
         <div className="statsGrid phaseStats">
           <Stat icon={<Heart/>} label="All memories" value={stats.total}/>
