@@ -403,13 +403,21 @@ export default function VoiceMentoPhase1() {
   }, [messages])
 
   useEffect(() => {
-    if (recording) timerRef.current = setInterval(() => {
+    const enforceLimit=()=>{
       const elapsed=Math.floor((Date.now()-startedAtRef.current)/1000)
       setSeconds(Math.min(MAX_RECORD_SECONDS,elapsed))
-      if (elapsed >= MAX_RECORD_SECONDS) finishMedia()
-    }, 250)
-    else if (timerRef.current) clearInterval(timerRef.current)
-    return () => timerRef.current && clearInterval(timerRef.current)
+      if(elapsed >= MAX_RECORD_SECONDS) finishMedia()
+    }
+    if (recording) {
+      timerRef.current=setInterval(enforceLimit,250)
+      document.addEventListener('visibilitychange',enforceLimit)
+      window.addEventListener('focus',enforceLimit)
+    }else if (timerRef.current) clearInterval(timerRef.current)
+    return ()=>{
+      if(timerRef.current)clearInterval(timerRef.current)
+      document.removeEventListener('visibilitychange',enforceLimit)
+      window.removeEventListener('focus',enforceLimit)
+    }
   }, [recording])
 
   useEffect(() => {
@@ -430,7 +438,7 @@ export default function VoiceMentoPhase1() {
   }, [view, boothStep, recording, preparing, tableGuest])
 
   useEffect(() => {
-    if (boothStep !== 'saved' || tableGuest) return
+    if (boothStep !== 'saved' || tableGuest || validCloudEvent(cloudConfig)) return
     setResetCountdown(RESET_SECONDS)
     const interval = setInterval(() => {
       setResetCountdown(v => {
@@ -443,7 +451,7 @@ export default function VoiceMentoPhase1() {
       })
     }, 1000)
     return () => clearInterval(interval)
-  }, [boothStep, tableGuest])
+  }, [boothStep, tableGuest, cloudConfig])
 
   const stats = useMemo(() => ({
     total: messages.length,
@@ -1282,8 +1290,8 @@ export default function VoiceMentoPhase1() {
                 </>
               ) : (
                 <>
-                  <p>{event.thankYouText}{guestName.trim()?' — '+guestName.trim():''}{cloudSaveStatus==='idle'?' Returning to the booth in '+resetCountdown+'s.':''}</p>
-                  <button className="secondary" onClick={exitToEntrance}><SkipForward size={18}/> Done</button>
+                  <p>{event.thankYouText}{guestName.trim()?' — '+guestName.trim():''}{!validCloudEvent(cloudConfig)?' Returning to the booth in '+resetCountdown+'s.':''}</p>
+                  {cloudSaveStatus!=='uploading' && <button className="secondary" onClick={exitToEntrance}><SkipForward size={18}/> Done</button>}
                 </>
               )}
             </div>
