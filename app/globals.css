@@ -454,3 +454,288 @@ body{min-height:100%;background:#f5f0ea}
 .entering .entranceCopy{
   animation:fadeAway .22s ease-out forwards!important;
 }
+
+/* Built-in telephone alcove: textured walls, recessed lamp, backing plate,
+   shelf and floor keep the receiver visually supported during the zoom.
+   The same interior appears on the guest phone screen. */
+.boothInterior{
+  overflow:hidden;
+  display:block!important;
+  isolation:isolate;
+}
+.boothAlcove{
+  position:absolute;
+  inset:0;
+  display:block;
+  overflow:hidden;
+  isolation:isolate;
+  border-radius:4px;
+  --interior-wall:var(--booth-inside,#584639);
+  --interior-panel:var(--booth-panel,#eee2d2);
+  --interior-brass:var(--booth-metal,#b58b6a);
+}
+.boothBackWall{
+  position:absolute;
+  inset:0;
+  z-index:0;
+  background:
+    repeating-linear-gradient(90deg,
+      transparent 0,transparent 23px,rgba(255,255,255,.035) 24px,
+      rgba(0,0,0,.045) 25px,transparent 27px),
+    radial-gradient(ellipse at 50% 25%,rgba(255,248,218,.36),transparent 58%),
+    linear-gradient(180deg,
+      color-mix(in srgb,var(--interior-wall) 67%,#e5d3b5),
+      var(--interior-wall) 58%,
+      color-mix(in srgb,var(--interior-wall) 78%,#211811));
+  box-shadow:inset 0 16px 25px rgba(0,0,0,.28),
+             inset 0 -24px 30px rgba(0,0,0,.37);
+}
+.boothWallTrim{
+  position:absolute;
+  top:0;
+  bottom:8%;
+  width:2px;
+  z-index:2;
+  background:linear-gradient(90deg,rgba(0,0,0,.35),
+    color-mix(in srgb,var(--interior-brass) 80%,white),
+    rgba(255,255,255,.2));
+  opacity:.7;
+}
+.boothWallTrimLeft{left:19%}
+.boothWallTrimRight{right:19%}
+.boothSideWall{
+  position:absolute;
+  top:0;
+  bottom:0;
+  width:21%;
+  z-index:3;
+  background:linear-gradient(90deg,
+    color-mix(in srgb,var(--interior-wall) 60%,#1d130e),
+    color-mix(in srgb,var(--interior-wall) 78%,#c2a68c));
+  box-shadow:inset 0 0 18px rgba(0,0,0,.27);
+}
+.boothSideWallLeft{
+  left:0;
+  clip-path:polygon(0 0,100% 8%,100% 91%,0 100%);
+  border-right:1px solid rgba(255,255,255,.09);
+}
+.boothSideWallRight{
+  right:0;
+  background:linear-gradient(90deg,
+    color-mix(in srgb,var(--interior-wall) 75%,#c2a68c),
+    color-mix(in srgb,var(--interior-wall) 60%,#1d130e));
+  clip-path:polygon(0 8%,100% 0,100% 100%,0 91%);
+  border-left:1px solid rgba(255,255,255,.09);
+}
+.boothCeilingGlow{
+  position:absolute;
+  left:25%;
+  right:25%;
+  top:-3%;
+  height:32%;
+  z-index:3;
+  pointer-events:none;
+  background:radial-gradient(ellipse at 50% 10%,
+    rgba(255,240,191,.73),rgba(255,234,199,.27) 39%,transparent 72%);
+}
+.boothCeilingGlow i{
+  position:absolute;
+  left:50%;
+  top:4%;
+  transform:translateX(-50%);
+  width:37%;
+  height:8px;
+  border-radius:0 0 12px 12px;
+  background:linear-gradient(#d6b68a,#fff4d1);
+  border:1px solid color-mix(in srgb,var(--interior-brass) 75%,#5c402a);
+  box-shadow:0 2px 12px rgba(255,231,171,.55);
+}
+.boothPhoneMount{
+  position:absolute;
+  z-index:2;
+  top:25%;
+  left:50%;
+  width:51%;
+  height:39%;
+  transform:translateX(-50%);
+  border-radius:8px 8px 4px 4px;
+  border:2px solid color-mix(in srgb,var(--interior-brass) 64%,#3f2b1e);
+  background:
+    linear-gradient(115deg,rgba(255,255,255,.19),transparent 35%),
+    linear-gradient(180deg,
+      color-mix(in srgb,var(--interior-panel) 62%,#9a7f63),
+      color-mix(in srgb,var(--interior-panel) 55%,#6a4c36));
+  box-shadow:inset 0 0 0 3px rgba(255,251,233,.17),
+    inset 0 8px 14px rgba(255,255,255,.07),
+    0 10px 19px rgba(20,14,10,.4);
+}
+.boothPhoneMount i{
+  position:absolute;
+  top:9px;
+  width:5px;
+  height:5px;
+  border-radius:50%;
+  background:radial-gradient(circle at 30% 25%,#fff6de,var(--interior-brass));
+  box-shadow:0 0 0 1px rgba(35,23,13,.4);
+}
+.boothPhoneMount i:first-child{left:9px}
+.boothPhoneMount i:last-child{right:9px}
+.boothShelfBracket{
+  position:absolute;
+  z-index:3;
+  top:62%;
+  width:7px;
+  height:12%;
+  background:linear-gradient(90deg,
+    color-mix(in srgb,var(--interior-brass) 68%,#463225),
+    color-mix(in srgb,var(--interior-brass) 78%,white));
+  border-radius:0 0 2px 2px;
+  box-shadow:1px 4px 6px rgba(0,0,0,.23);
+}
+.boothShelfBracketLeft{left:28%}
+.boothShelfBracketRight{right:28%}
+.boothPhoneShelf{
+  position:absolute;
+  z-index:4;
+  left:50%;
+  top:61%;
+  width:72%;
+  height:7%;
+  transform:translateX(-50%);
+  border-radius:3px 3px 6px 6px;
+  border:1px solid color-mix(in srgb,var(--interior-brass) 67%,#473020);
+  background:linear-gradient(180deg,
+    color-mix(in srgb,var(--interior-panel) 73%,white) 0 22%,
+    color-mix(in srgb,var(--interior-panel) 83%,#4d392c) 25%,
+    color-mix(in srgb,var(--interior-panel) 54%,#312217) 100%);
+  box-shadow:0 8px 14px rgba(0,0,0,.37),
+    inset 0 1px rgba(255,255,255,.44);
+}
+.boothPhoneWrap{
+  position:absolute;
+  z-index:6;
+  left:50%;
+  top:61%;
+  width:100%;
+  height:0;
+  transform:translateX(-50%);
+  pointer-events:none;
+}
+.boothAlcoveMini .boothPhoneWrap .vintagePhone.compact{
+  position:absolute;
+  left:50%;
+  bottom:0;
+  width:190px;
+  height:184px;
+  margin:0 0 0 -95px;
+  --phone-scale:.57;
+  transform-origin:center bottom;
+  filter:drop-shadow(0 5px 5px rgba(24,15,10,.36));
+}
+.boothFloor{
+  position:absolute;
+  z-index:1;
+  left:13%;
+  right:13%;
+  bottom:-6%;
+  height:21%;
+  background:
+    radial-gradient(ellipse at 50% 0,rgba(255,255,255,.08),transparent 67%),
+    linear-gradient(180deg,
+      color-mix(in srgb,var(--interior-wall) 75%,#4b382b),
+      color-mix(in srgb,var(--interior-wall) 43%,#100e0c));
+  transform:perspective(180px) rotateX(35deg);
+  box-shadow:inset 0 9px 15px rgba(0,0,0,.36),
+    0 -5px 10px rgba(0,0,0,.12);
+}
+.boothInteriorCaption{
+  position:absolute!important;
+  z-index:6;
+  left:0!important;
+  right:0!important;
+  bottom:8%!important;
+  display:block!important;
+  width:100%!important;
+  margin:0!important;
+  text-align:center!important;
+  color:#fdf5e7;
+  font-size:9px;
+  text-shadow:0 2px 5px #1b100a;
+}
+.entering .boothInteriorCaption{
+  visibility:hidden!important;
+  opacity:0!important;
+}
+.boothStagePreview .boothAlcoveMini .boothPhoneWrap .vintagePhone.compact{
+  --phone-scale:.45;
+}
+/* Larger version of the same enclosed phone niche behind the guest options. */
+.openedBoothPhone.boothInteriorDisplay{
+  position:relative;
+  z-index:3;
+  flex:0 1 auto;
+  width:min(350px,100%);
+  height:clamp(188px,26svh,236px);
+  min-height:0;
+  margin:2px auto 13px;
+  border:5px solid color-mix(in srgb,var(--booth-panel) 73%,#8c684b);
+  border-radius:20px 20px 13px 13px;
+  background:var(--booth-inside);
+  box-shadow:inset 0 0 0 2px rgba(255,255,255,.16),
+    0 10px 30px rgba(52,34,21,.16);
+  filter:none;
+  overflow:hidden;
+}
+.boothInteriorDisplay .boothAlcove{
+  border-radius:14px 14px 8px 8px;
+}
+.boothInteriorDisplay .boothPhoneMount{
+  top:18%;
+  width:42%;
+  height:61%;
+}
+.boothInteriorDisplay .boothPhoneShelf{
+  top:80%;
+  width:66%;
+  height:8%;
+}
+.boothInteriorDisplay .boothShelfBracket{
+  top:85%;
+  height:10%;
+}
+.boothInteriorDisplay .boothPhoneWrap{
+  top:80%;
+}
+.boothAlcoveGuest .boothPhoneWrap .vintagePhone{
+  position:absolute;
+  left:50%;
+  bottom:0;
+  width:190px;
+  height:184px;
+  margin:0 0 0 -95px;
+  --phone-scale:.83;
+  transform-origin:center bottom;
+  filter:drop-shadow(0 7px 9px rgba(19,13,9,.3));
+}
+.boothInteriorDisplay .boothFloor{
+  bottom:-10%;
+  height:21%;
+}
+@media(max-width:700px){
+  .openedBoothPhone.boothInteriorDisplay{
+    height:clamp(165px,24svh,211px);
+    margin:0 auto 8px;
+    border-width:4px;
+  }
+  .boothAlcoveGuest .boothPhoneWrap .vintagePhone{
+    --phone-scale:.67;
+  }
+}
+@media(max-width:430px){
+  .openedBoothPhone.boothInteriorDisplay{
+    height:clamp(151px,22svh,190px);
+  }
+  .boothAlcoveGuest .boothPhoneWrap .vintagePhone{
+    --phone-scale:.60;
+  }
+}
